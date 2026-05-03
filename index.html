@@ -11,190 +11,234 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#07090f;color:#cbd5e1;font-family:'Segoe UI',Arial,sans-serif;}
 ::-webkit-scrollbar{width:5px;} ::-webkit-scrollbar-track{background:#0d1117;} ::-webkit-scrollbar-thumb{background:#1a2030;border-radius:9px;}
-select option{background:#07090f;}
-input[type=range]{width:100%;}
+select option{background:#07090f;} input[type=range]{width:100%;}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const useState    = React.useState;
-const useRef      = React.useRef;
-const useMemo     = React.useMemo;
-const useEffect   = React.useEffect;
-const useCallback = React.useCallback;
+const {useState,useRef,useMemo,useEffect,useCallback} = React;
 
-// ─── JSONBIN CONFIG ───────────────────────────────────────────────────────────
-const JSONBIN_KEY = "$2a$10$ecFrK4rlHLNxqPQ4EWDiOORHEKfmbia34dQ3kLN7BTUHAcYbq1G5q";
-const JSONBIN_URL = "https://api.jsonbin.io/v3/b";
-let   BIN_ID      = localStorage.getItem("vlc_bin_id") || null;
+/* ── JSONBIN ── */
+const JKEY = "$2a$10$ecFrK4rlHLNxqPQ4EWDiOORHEKfmbia34dQ3kLN7BTUHAcYbq1G5q";
+const JURL = "https://api.jsonbin.io/v3/b";
+let BIN_ID = localStorage.getItem("vlc_bin_id") || null;
 
 async function dbLoad(){
-  try {
+  try{
     if(!BIN_ID){
-      // create a new bin on first run
-      const r = await fetch(JSONBIN_URL, {
-        method:"POST",
-        headers:{"Content-Type":"application/json","X-Master-Key":JSONBIN_KEY,"X-Bin-Name":"valencia116d"},
-        body: JSON.stringify({init:true})
-      });
-      const d = await r.json();
-      BIN_ID = d.metadata?.id;
-      if(BIN_ID) localStorage.setItem("vlc_bin_id", BIN_ID);
-      return null; // fresh start
+      const r=await fetch(JURL,{method:"POST",headers:{"Content-Type":"application/json","X-Master-Key":JKEY,"X-Bin-Name":"valencia116d"},body:JSON.stringify({_init:true})});
+      const d=await r.json();
+      BIN_ID=d.metadata?.id||null;
+      if(BIN_ID) localStorage.setItem("vlc_bin_id",BIN_ID);
+      return null;
     }
-    const r = await fetch(JSONBIN_URL+"/"+BIN_ID+"/latest", {
-      headers:{"X-Master-Key":JSONBIN_KEY}
-    });
-    const d = await r.json();
-    if(d.record?.init) return null;
-    return d.record || null;
-  } catch(e){ console.error("Load error",e); return null; }
+    const r=await fetch(JURL+"/"+BIN_ID+"/latest",{headers:{"X-Master-Key":JKEY}});
+    const d=await r.json();
+    if(d.record?._init) return null;
+    return d.record||null;
+  }catch(e){console.error(e);return null;}
 }
-
 async function dbSave(data){
-  try {
+  try{
     if(!BIN_ID) return false;
-    const r = await fetch(JSONBIN_URL+"/"+BIN_ID, {
-      method:"PUT",
-      headers:{"Content-Type":"application/json","X-Master-Key":JSONBIN_KEY},
-      body: JSON.stringify(data)
-    });
+    const r=await fetch(JURL+"/"+BIN_ID,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":JKEY},body:JSON.stringify(data)});
     return r.ok;
-  } catch(e){ console.error("Save error",e); return false; }
+  }catch(e){console.error(e);return false;}
 }
 
-// ─── USERS ───────────────────────────────────────────────────────────────────
-const USERS = [
-  {id:"omer",   name:"Omer",         role:"Owner",           pin:"2123", color:"#a78bfa", icon:"👑", perm:"all"},
-  {id:"office", name:"Office",       role:"Project Manager", pin:"9999", color:"#38bdf8", icon:"🏢", perm:"payments_only"},
-  {id:"awais",  name:"Awais (Site)", role:"Site Supervisor", pin:null,   color:"#22c55e", icon:"🦺", perm:"add_only"},
+/* ── CONSTANTS ── */
+const USERS=[
+  {id:"omer",  name:"Omer",        role:"Owner",          pin:"2123",color:"#a78bfa",icon:"👑",perm:"all"},
+  {id:"office",name:"Office",      role:"Project Manager",pin:"9999",color:"#38bdf8",icon:"🏢",perm:"payments_only"},
+  {id:"awais", name:"Awais (Site)",role:"Site Supervisor",pin:null,  color:"#22c55e",icon:"🦺",perm:"add_only"},
 ];
-
-const PROJECT = {name:"Plot 116-D Valencia Town",client:"Mr. Omer",architect:"Ar. Fazeel Amjad",firm:"GharPlans.pk",plotSize:"75′×120′",totalArea:"13,704 sqft"};
-
-const TASKS = [
-  {id:1,  name:"Plumbing",                   icon:"🔧",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"P-02→P-09",details:["Sewerage traps on all floors","Submersible pumps ×2","UGWT + OHWT at Roof","Hot water lines","Pool drain plumbing","Gas pipe","Sunken slabs at wet areas"],scope:"13+ wet areas, pool machine room, 3 kitchens"},
-  {id:2,  name:"Electrification",            icon:"⚡",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-01→E-09",details:["DB boards + full wiring","CCTV 8 cameras","Dumb waiter electrical","Double-height lounge wiring","Earthing + surge protection"],scope:"All rooms, lounge, pool, quarters"},
-  {id:3,  name:"Floor Finalization",         icon:"🏗️",cat:"Structural",    priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"Structural sheets",details:["GF: PCC + brick ballast + finish","1st slab: RCC + ballast + PCC","Roof: polythene + bitumen + tiles","Depressed slabs at bathrooms","Pool deck 23′×12′"],scope:"All floors, terraces, pool deck"},
-  {id:4,  name:"Boundary Walls",             icon:"🧱",cat:"Exterior",      priority:"high",    floors:["Ground Level"],ref:"A-02,A-07",details:["Front wall 75′","Side walls 120′ each","Rear wall 75′","Gate pillars + pedestrian gate","Compound plaster + paint","Water body feature wall"],scope:"Full 75′×120′ perimeter"},
-  {id:5,  name:"Roof / Quarters & Canopies", icon:"🏠",cat:"Exterior",      priority:"high",    floors:["Roof/Quarters"],ref:"A-10→A-16",details:["Twin hip roofs dark grey tiles","Porch canopy 25′×15′","Balcony overhangs GF + 1F","Quarters verandah canopy","SQ-1 & SQ-2 quarters rooms","Quarters kitchen + bath + lobby","Roof insulation polythene + bitumen"],scope:"Twin roof, porch, 4 balconies, quarters SQ1+SQ2"},
-  {id:6,  name:"UPVC Windows",               icon:"🪟",cat:"Finishing",     priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-18→A-21",details:["Basement 4 large openings","Ground double-height lounge 14′×22′","First taller openings 7′ to 8′-6″","Roof/Quarters W 8′×3′-6″ ×2","~40+ openings total"],scope:"~40 window openings"},
-  {id:7,  name:"Floor Tiles",                icon:"⬜",cat:"Finishing",     priority:"medium",  floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"Floor detail",details:["Basement: Entertainment, Theatre, Guest","Ground: Lounge, Dining, Kitchen, Master","First: Master, Beds, Lounge, Kitchen","Quarters: SQ-1, SQ-2, Lobby","All bathrooms anti-slip","Terraces outdoor-rated"],scope:"~13,700 sqft total"},
-  {id:8,  name:"Pool (Tiles & Pump)",        icon:"🏊",cat:"Exterior",      priority:"medium",  floors:["Basement"],ref:"P-02,A-06",details:["Pool 15′×30′ basement","Pool deck 23′×12′","Machine room + pumps","Sump pit 4′×2′×5′","Shower + changing area"],scope:"Basement pool zone"},
-  {id:9,  name:"Stairs Finalization",        icon:"🪜",cat:"Structural",    priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-06→A-08",details:["SC-1 B→GF Cantilever 20 risers","SC-2 B→Pool RCC 19 risers","SC-3 GF→1F Cantilever 21 risers","SC-4 1F→Roof Cantilever 21 risers","MS/glass railing"],scope:"4 staircases"},
-  {id:10, name:"Woodwork & Closets",         icon:"🪵",cat:"Interior",      priority:"medium",  floors:["Ground Floor","First Floor"],ref:"A-07,A-08",details:["Ground: WI Closet 9′×10′","First: WI Closet 14′×8′","4 Media walls","Kitchen joinery"],scope:"5 walk-in closets, 4 media walls"},
-  {id:11, name:"Doors Installation",         icon:"🚪",cat:"Interior",      priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-18→A-21",details:["Basement 9 doors","Ground 11 doors grand entrance 8′","First 9 doors","Roof/Quarters 6 doors","~35 total"],scope:"~35 door openings"},
-  {id:12, name:"Sanitary Fittings",          icon:"🚿",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"P-02→P-09",details:["Basement: Guest Bath + Pool Shower","Ground: Master Bath, S.Bath, PWD","First: Shared Bath, Dress/Bath ×2","Quarters: Bath + kitchen sink","3 kitchens"],scope:"12 bathrooms, 3 kitchens"},
-  {id:13, name:"Lights & Fixtures",          icon:"💡",cat:"Interior",      priority:"medium",  floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-02→E-05",details:["Lounge chandelier","Porch recessed downlights","Basement cove lighting","Theatre dimmable","Pool underwater LED","Facade uplighters"],scope:"All 35+ rooms, outdoor, pool"},
-  {id:14, name:"Boundary Wall Works",        icon:"🏰",cat:"Exterior",      priority:"high",    floors:["Ground Level"],ref:"Site boundary",details:["Motorised entrance gate","Pedestrian gate","Coping + weatherproofing","Exterior plaster + paint","Driveway paving 20′","Compound lighting","Security intercom"],scope:"Full perimeter, gates, driveway"},
-  {id:15, name:"Garage Works",               icon:"🚗",cat:"Exterior",      priority:"high",    floors:["Ground Level"],ref:"A-02,A-07",details:["3-car porch 25′×15′ anti-slip tiles","Bike garage 9′×9′ roller shutter","Car wash drainage","Basement ramp vehicle access","Garage door automation","Driveway drainage channels"],scope:"3-car porch, bike garage, ramp"},
-  {id:16, name:"Solar Installation",         icon:"☀️",cat:"Infrastructure",priority:"medium",  floors:["Roof/Quarters"],ref:"Electrical drawings",details:["System sizing per floor load","South-facing panels on roof","Inverter room at Roof/Quarters","DC cable to inverter","Net metering LESCO","Surge protection","Monitoring display"],scope:"Roof panels, inverter room, DB integration"},
-  {id:17, name:"AC Works",                   icon:"❄️",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-01→E-09",details:["Basement 3 cassette units","Ground 4-5 units","First 4 units","Roof/Quarters 1-2 units","Compressor pads","Copper refrigerant lines","Condensate drains","Gas charging + commissioning"],scope:"12-15 AC units across all floors"},
+const PROJECT={name:"Plot 116-D Valencia Town",client:"Mr. Omer",architect:"Ar. Fazeel Amjad",firm:"GharPlans.pk",plotSize:"75′×120′",totalArea:"13,704 sqft"};
+const TASKS=[
+  {id:1, name:"Plumbing",                  icon:"🔧",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"P-02→P-09",details:["Sewerage traps all floors","Submersible pumps ×2","UGWT+OHWT at Roof","Hot water lines","Pool drain plumbing","Gas pipe","Sunken slabs wet areas"],scope:"13+ wet areas, pool machine room, 3 kitchens"},
+  {id:2, name:"Electrification",           icon:"⚡",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-01→E-09",details:["DB boards + full wiring","CCTV 8 cameras","Dumb waiter electrical","Double-height lounge wiring","Earthing + surge protection"],scope:"All rooms, lounge, pool, quarters"},
+  {id:3, name:"Floor Finalization",        icon:"🏗️",cat:"Structural",   priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"Structural sheets",details:["GF: PCC+ballast+finish","1st slab: RCC+ballast+PCC","Roof: polythene+bitumen+tiles","Depressed slabs bathrooms","Pool deck 23′×12′"],scope:"All floors, terraces, pool deck"},
+  {id:4, name:"Boundary Walls",            icon:"🧱",cat:"Exterior",     priority:"high",    floors:["Ground Level"],ref:"A-02,A-07",details:["Front wall 75′","Side walls 120′ each","Rear wall 75′","Gate pillars+pedestrian gate","Compound plaster+paint","Water body feature wall"],scope:"Full 75′×120′ perimeter"},
+  {id:5, name:"Roof/Quarters & Canopies",  icon:"🏠",cat:"Exterior",     priority:"high",    floors:["Roof/Quarters"],ref:"A-10→A-16",details:["Twin hip roofs dark grey tiles","Porch canopy 25′×15′","Balcony overhangs GF+1F","Quarters verandah canopy","SQ-1 & SQ-2 rooms","Quarters kitchen+bath+lobby","Roof insulation polythene+bitumen"],scope:"Twin roof, porch, 4 balconies, quarters SQ1+SQ2"},
+  {id:6, name:"UPVC Windows",              icon:"🪟",cat:"Finishing",    priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-18→A-21",details:["Basement 4 large openings","Ground double-height 14′×22′","First taller 7′ to 8′-6″","Roof/Quarters W 8′×3′-6″ ×2","~40+ openings total"],scope:"~40 window openings"},
+  {id:7, name:"Floor Tiles",               icon:"⬜",cat:"Finishing",    priority:"medium",  floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"Floor detail",details:["Basement: Entertainment,Theatre,Guest","Ground: Lounge,Dining,Kitchen,Master","First: Master,Beds,Lounge,Kitchen","Quarters: SQ-1,SQ-2,Lobby","All bathrooms anti-slip","Terraces outdoor-rated"],scope:"~13,700 sqft total"},
+  {id:8, name:"Pool (Tiles & Pump)",       icon:"🏊",cat:"Exterior",     priority:"medium",  floors:["Basement"],ref:"P-02,A-06",details:["Pool 15′×30′ basement","Pool deck 23′×12′","Machine room+pumps","Sump pit 4′×2′×5′","Shower+changing area"],scope:"Basement pool zone"},
+  {id:9, name:"Stairs Finalization",       icon:"🪜",cat:"Structural",   priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-06→A-08",details:["SC-1 B→GF Cantilever 20 risers","SC-2 B→Pool RCC 19 risers","SC-3 GF→1F Cantilever 21 risers","SC-4 1F→Roof Cantilever 21 risers","MS/glass railing"],scope:"4 staircases"},
+  {id:10,name:"Woodwork & Closets",        icon:"🪵",cat:"Interior",     priority:"medium",  floors:["Ground Floor","First Floor"],ref:"A-07,A-08",details:["Ground: WI Closet 9′×10′","First: WI Closet 14′×8′","4 Media walls","Kitchen joinery"],scope:"5 walk-in closets, 4 media walls"},
+  {id:11,name:"Doors Installation",        icon:"🚪",cat:"Interior",     priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-18→A-21",details:["Basement 9 doors","Ground 11 doors entrance 8′","First 9 doors","Roof/Quarters 6 doors","~35 total"],scope:"~35 door openings"},
+  {id:12,name:"Sanitary Fittings",         icon:"🚿",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"P-02→P-09",details:["Basement: Guest Bath+Pool Shower","Ground: Master Bath,S.Bath,PWD","First: Shared Bath,Dress/Bath ×2","Quarters: Bath+kitchen sink","3 kitchens"],scope:"12 bathrooms, 3 kitchens"},
+  {id:13,name:"Lights & Fixtures",         icon:"💡",cat:"Interior",     priority:"medium",  floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-02→E-05",details:["Lounge chandelier","Porch recessed downlights","Basement cove lighting","Theatre dimmable","Pool underwater LED","Facade uplighters"],scope:"All 35+ rooms, outdoor, pool"},
+  {id:14,name:"Boundary Wall Works",       icon:"🏰",cat:"Exterior",     priority:"high",    floors:["Ground Level"],ref:"Site boundary",details:["Motorised entrance gate","Pedestrian gate","Coping+weatherproofing","Exterior plaster+paint","Driveway paving 20′","Compound lighting","Security intercom"],scope:"Full perimeter, gates, driveway"},
+  {id:15,name:"Garage Works",              icon:"🚗",cat:"Exterior",     priority:"high",    floors:["Ground Level"],ref:"A-02,A-07",details:["3-car porch 25′×15′ anti-slip","Bike garage 9′×9′ roller shutter","Car wash drainage","Basement ramp vehicle access","Garage door automation","Driveway drainage"],scope:"3-car porch, bike garage, ramp"},
+  {id:16,name:"Solar Installation",        icon:"☀️",cat:"Infrastructure",priority:"medium",  floors:["Roof/Quarters"],ref:"Electrical drawings",details:["System sizing per floor load","South-facing panels on roof","Inverter room Roof/Quarters","DC cable to inverter","Net metering LESCO","Surge protection","Monitoring display"],scope:"Roof panels, inverter room, DB integration"},
+  {id:17,name:"AC Works",                  icon:"❄️",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-01→E-09",details:["Basement 3 cassette units","Ground 4-5 units","First 4 units","Roof/Quarters 1-2 units","Compressor pads","Copper refrigerant lines","Condensate drains","Gas charging+commissioning"],scope:"12-15 AC units across all floors"},
 ];
-
-const STATUS   = {"not-started":{label:"Not Started",color:"#64748b"},"in-progress":{label:"In Progress",color:"#f59e0b"},"completed":{label:"Completed",color:"#22c55e"},"blocked":{label:"Blocked",color:"#f43f5e"}};
-const PRICOLOR = {critical:"#f43f5e",high:"#fb923c",medium:"#38bdf8"};
-const METHODS  = ["Cash","Bank Transfer","Cheque","Online Transfer","JazzCash","EasyPaisa"];
-const UNITS    = ["bags","tons","cft","sft","rft","nos","kg","ltr","boxes","pcs"];
-const CATS     = ["All",...[...new Set(TASKS.map(t=>t.cat))]];
-const FLOORS   = ["All","Basement","Ground Floor","First Floor","Roof/Quarters","Ground Level"];
+const STATUS  ={"not-started":{label:"Not Started",color:"#64748b"},"in-progress":{label:"In Progress",color:"#f59e0b"},"completed":{label:"Completed",color:"#22c55e"},"blocked":{label:"Blocked",color:"#f43f5e"}};
+const PRICLR  ={critical:"#f43f5e",high:"#fb923c",medium:"#38bdf8"};
+const METHODS =["Cash","Bank Transfer","Cheque","Online Transfer","JazzCash","EasyPaisa"];
+const UNITS   =["bags","tons","cft","sft","rft","nos","kg","ltr","boxes","pcs"];
+const CATS    =["All",...[...new Set(TASKS.map(t=>t.cat))]];
+const FLOORS  =["All","Basement","Ground Floor","First Floor","Roof/Quarters","Ground Level"];
 
 const fmt  = n=>"PKR "+Number(n||0).toLocaleString("en-PK");
 const fmtM = n=>n>=1e6?(n/1e6).toFixed(2)+"M":n>=1000?Math.round(n/1000)+"K":String(n||0);
-const ts   = ()=>new Date().toLocaleString("en-PK",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
-const tday = ()=>new Date().toISOString().slice(0,10);
+const now  = ()=>new Date().toLocaleString("en-PK",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+const today= ()=>new Date().toISOString().slice(0,10);
 
+/* ── DEFAULT DATA ── */
 function mkData(){
-  return {
-    names:  TASKS.reduce((a,t)=>({...a,[t.id]:t.name}),{}),
-    tasks:  TASKS.reduce((a,t)=>({...a,[t.id]:{status:"not-started",progress:0,notes:"",updatedBy:null,updatedAt:null,history:[],budget:{total:0,paid:0,payments:[]},contractor:{name:"",phone:"",co:""},photos:[]}}),{}),
-    labour: [], mats: [], log: [],
+  return{
+    names: TASKS.reduce((a,t)=>({...a,[t.id]:t.name}),{}),
+    tasks: TASKS.reduce((a,t)=>({...a,[t.id]:{status:"not-started",progress:0,notes:"",updatedBy:null,history:[],budget:{total:0,paid:0,payments:[]},contractor:{name:"",phone:"",co:""},photos:[]}}),{}),
+    labour:[],mats:[],log:[],
   };
 }
+function mergeData(saved){
+  const base=mkData();
+  if(!saved) return base;
+  const merged={...base,...saved};
+  TASKS.forEach(t=>{
+    if(!merged.tasks[t.id]) merged.tasks[t.id]=base.tasks[t.id];
+    if(!merged.names[t.id]) merged.names[t.id]=t.name;
+  });
+  return merged;
+}
 
+/* ── THEME ── */
 const T={bg:"#07090f",panel:"#0d1117",border:"#1a2030",dim:"#334155",mid:"#475569",text:"#cbd5e1",hi:"#f1f5f9",green:"#22c55e",amber:"#f59e0b",red:"#f43f5e",purple:"#a78bfa"};
-const iStyle=(x={})=>({background:T.bg,border:"1px solid "+T.border,borderRadius:8,padding:"8px 11px",color:T.text,fontSize:13,outline:"none",fontFamily:"inherit",width:"100%",boxSizing:"border-box",...x});
-const bStyle=(bg,fg="#fff",x={})=>({background:bg,color:fg,border:"none",borderRadius:8,padding:"8px 14px",fontSize:12,cursor:"pointer",fontWeight:600,fontFamily:"inherit",...x});
-const chip=(color)=>({display:"inline-block",fontSize:9,fontWeight:700,letterSpacing:1,textTransform:"uppercase",padding:"2px 7px",borderRadius:99,border:"1px solid "+color+"55",background:color+"18",color});
+const IS=(x={})=>({background:T.bg,border:"1px solid "+T.border,borderRadius:8,padding:"8px 11px",color:T.text,fontSize:13,outline:"none",fontFamily:"inherit",width:"100%",boxSizing:"border-box",...x});
+const BS=(bg,fg="#fff",x={})=>({background:bg,color:fg,border:"none",borderRadius:8,padding:"8px 14px",fontSize:12,cursor:"pointer",fontWeight:600,fontFamily:"inherit",...x});
+const CH=(c)=>({display:"inline-block",fontSize:9,fontWeight:700,letterSpacing:1,textTransform:"uppercase",padding:"2px 7px",borderRadius:99,border:"1px solid "+c+"55",background:c+"18",color:c});
+const LB=(t)=><div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>{t}</div>;
 
-// ─── SMALL COMPONENTS ─────────────────────────────────────────────────────────
+/* ════════════════ LOGIN ════════════════ */
+function LoginScreen({onLogin}){
+  const [sel,setSel]=useState(null);
+  const [pin,setPin]=useState("");
+  const [err,setErr]=useState("");
+  function pick(u){ if(!u.pin){onLogin(u);}else{setSel(u);setPin("");setErr("");} }
+  function attempt(){ if(!sel)return; if(pin===sel.pin){onLogin(sel);}else{setErr("Incorrect PIN");setPin("");} }
+  return(
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:18,padding:40,width:340,textAlign:"center",boxShadow:"0 24px 64px #00000088"}}>
+        <div style={{fontSize:48,marginBottom:10}}>🏡</div>
+        <div style={{fontSize:20,color:T.hi,fontWeight:700,marginBottom:4}}>Valencia 116-D</div>
+        <div style={{fontSize:12,color:T.mid,marginBottom:4}}>{PROJECT.name}</div>
+        <div style={{fontSize:11,color:T.dim,marginBottom:28}}>{PROJECT.plotSize} · {PROJECT.totalArea}</div>
+        {!sel?(
+          <>
+            <div style={{fontSize:11,color:T.mid,marginBottom:14,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600}}>Select Profile</div>
+            {USERS.map(u=>(
+              <button key={u.id} onClick={()=>pick(u)}
+                style={{width:"100%",marginBottom:10,padding:"14px 16px",textAlign:"left",display:"flex",alignItems:"center",gap:14,border:"1px solid "+T.border,borderRadius:12,background:T.border,cursor:"pointer",fontFamily:"inherit"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=u.color;e.currentTarget.style.background=u.color+"22";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.border;}}>
+                <span style={{fontSize:26}}>{u.icon}</span>
+                <div style={{flex:1,textAlign:"left"}}><div style={{fontSize:14,color:T.hi,fontWeight:600}}>{u.name}</div><div style={{fontSize:11,color:u.color,marginTop:2}}>{u.role}</div></div>
+                <span style={{fontSize:12,color:T.dim}}>{u.pin?"🔒":"→"}</span>
+              </button>
+            ))}
+          </>
+        ):(
+          <>
+            <div style={{fontSize:28,marginBottom:6}}>{sel.icon}</div>
+            <div style={{fontSize:15,color:T.hi,fontWeight:600,marginBottom:2}}>{sel.name}</div>
+            <div style={{fontSize:11,color:sel.color,marginBottom:20}}>{sel.role}</div>
+            {LB("Enter PIN")}
+            <input type="password" value={pin} maxLength={6} autoFocus
+              onChange={e=>setPin(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&attempt()}
+              placeholder="••••"
+              style={IS({textAlign:"center",fontSize:24,letterSpacing:10,marginBottom:8,padding:"12px"})}/>
+            {err&&<div style={{fontSize:11,color:T.red,marginBottom:8}}>{err}</div>}
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              <button onClick={()=>setSel(null)} style={BS(T.border,T.mid,{flex:1})}>← Back</button>
+              <button onClick={attempt} style={BS(sel.color,"#000",{flex:1,fontWeight:700})}>Login</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════ SMALL COMPONENTS ════════════════ */
 function NameEdit({id,name,canEdit,onSave}){
-  const [editing,setEditing]=useState(false);
-  const [val,setVal]=useState(name);
-  function commit(){ if(val.trim()) onSave(id,val.trim()); setEditing(false); }
-  if(!canEdit||!editing) return <div style={{fontWeight:700,fontSize:13,color:T.hi,marginBottom:2,display:"flex",alignItems:"center",gap:5}}><span>{name}</span>{canEdit&&<span onClick={e=>{e.stopPropagation();setEditing(true);setVal(name);}} style={{fontSize:9,color:T.dim,cursor:"pointer",opacity:.5}}>✏️</span>}</div>;
-  return <input autoFocus value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} onKeyDown={e=>{if(e.key==="Enter")commit();if(e.key==="Escape")setEditing(false);}} onClick={e=>e.stopPropagation()} style={iStyle({fontSize:13,padding:"3px 7px",fontWeight:600,marginBottom:2})}/>;
+  const [e,setE]=useState(false);
+  const [v,setV]=useState(name);
+  const commit=()=>{ if(v.trim()) onSave(id,v.trim()); setE(false); };
+  if(!canEdit||!e) return <div style={{fontWeight:700,fontSize:13,color:T.hi,marginBottom:2,display:"flex",alignItems:"center",gap:5}}><span>{name}</span>{canEdit&&<span onClick={ev=>{ev.stopPropagation();setE(true);setV(name);}} style={{fontSize:9,color:T.dim,cursor:"pointer",opacity:.5}}>✏️</span>}</div>;
+  return <input autoFocus value={v} onChange={ev=>setV(ev.target.value)} onBlur={commit} onKeyDown={ev=>{if(ev.key==="Enter")commit();if(ev.key==="Escape")setE(false);}} onClick={ev=>ev.stopPropagation()} style={IS({fontSize:13,padding:"3px 7px",fontWeight:600,marginBottom:2})}/>;
 }
 
 function LabourForm({onAdd}){
-  const [amt,setAmt]=useState(""); const [date,setDate]=useState(tday()); const [work,setWork]=useState(""); const [worker,setWorker]=useState(""); const [method,setMethod]=useState("Cash"); const [note,setNote]=useState("");
-  function go(){ const a=Number(amt); if(!a||a<=0) return; onAdd({amount:a,date,worker,work,method,note}); setAmt(""); setWorker(""); setWork(""); setNote(""); }
+  const [a,setA]=useState(""); const [d,setD]=useState(today()); const [w,setW]=useState(""); const [wk,setWk]=useState(""); const [m,setM]=useState("Cash"); const [n,setN]=useState("");
+  function go(){ const amt=Number(a); if(!amt||amt<=0)return; onAdd({amount:amt,date:d,worker:wk,work:w,method:m,note:n}); setA("");setWk("");setW("");setN(""); }
   return(
     <div style={{background:T.panel,border:"1px solid #7c2d1244",borderRadius:12,padding:16,marginBottom:14}}>
       <div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>➕ Record Labour Payment</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
-        <input type="number" value={amt}    onChange={e=>setAmt(e.target.value)}    placeholder="Amount (PKR) *" style={iStyle({color:T.green,fontWeight:600})}/>
-        <input type="date"   value={date}   onChange={e=>setDate(e.target.value)}   style={iStyle()}/>
-        <select              value={method} onChange={e=>setMethod(e.target.value)} style={iStyle()}>{METHODS.map(m=><option key={m}>{m}</option>)}</select>
+        <input type="number" value={a}  onChange={e=>setA(e.target.value)}  placeholder="Amount (PKR) *" style={IS({color:T.green,fontWeight:600})}/>
+        <input type="date"   value={d}  onChange={e=>setD(e.target.value)}  style={IS()}/>
+        <select              value={m}  onChange={e=>setM(e.target.value)}  style={IS()}>{METHODS.map(x=><option key={x}>{x}</option>)}</select>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-        <input value={worker} onChange={e=>setWorker(e.target.value)} placeholder="Worker name"       style={iStyle()}/>
-        <input value={work}   onChange={e=>setWork(e.target.value)}   placeholder="Work description *" style={iStyle()}/>
-        <input value={note}   onChange={e=>setNote(e.target.value)}   placeholder="Note / reference"   style={iStyle()}/>
+        <input value={wk} onChange={e=>setWk(e.target.value)} placeholder="Worker name"        style={IS()}/>
+        <input value={w}  onChange={e=>setW(e.target.value)}  placeholder="Work description *" style={IS()}/>
+        <input value={n}  onChange={e=>setN(e.target.value)}  placeholder="Note / reference"   style={IS()}/>
       </div>
-      <button onClick={go} disabled={!amt||Number(amt)<=0} style={bStyle("#7c2d12","#fed7aa",{width:"100%",padding:"9px",opacity:!amt||Number(amt)<=0?.5:1})}>+ Record Labour Payment</button>
+      <button onClick={go} disabled={!a||Number(a)<=0} style={BS("#7c2d12","#fed7aa",{width:"100%",padding:"9px",opacity:!a||Number(a)<=0?.5:1})}>+ Record Labour Payment</button>
     </div>
   );
 }
 
 function MatForm({onAdd}){
-  const [name,setName]=useState(""); const [unit,setUnit]=useState("bags"); const [qty,setQty]=useState(""); const [date,setDate]=useState(tday()); const [type,setType]=useState("received"); const [rate,setRate]=useState(""); const [supp,setSupp]=useState(""); const [note,setNote]=useState("");
-  function go(){ const q=Number(qty); if(!name.trim()||!q||q<=0) return; onAdd({name:name.trim(),unit,qty:q,type,date,rate:Number(rate)||0,supplier:supp,note}); setQty(""); setRate(""); setNote(""); setSupp(""); }
+  const [nm,setNm]=useState(""); const [u,setU]=useState("bags"); const [q,setQ]=useState(""); const [d,setD]=useState(today()); const [tp,setTp]=useState("received"); const [r,setR]=useState(""); const [s,setS]=useState(""); const [n,setN]=useState("");
+  function go(){ const qty=Number(q); if(!nm.trim()||!qty||qty<=0)return; onAdd({name:nm.trim(),unit:u,qty,type:tp,date:d,rate:Number(r)||0,supplier:s,note:n}); setQ("");setR("");setN("");setS(""); }
   return(
     <div style={{background:T.panel,border:"1px solid #0f766e44",borderRadius:12,padding:16,marginBottom:14}}>
       <div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>➕ Add Material Entry</div>
       <div style={{display:"flex",gap:8,marginBottom:12}}>
-        <button onClick={()=>setType("received")} style={bStyle(type==="received"?"#0f766e":T.border,type==="received"?"#5eead4":T.mid,{flex:1,fontSize:12})}>📥 Received</button>
-        <button onClick={()=>setType("issued")}   style={bStyle(type==="issued"?"#7c1d1d":T.border,type==="issued"?"#fca5a5":T.mid,{flex:1,fontSize:12})}>📤 Issued</button>
+        <button onClick={()=>setTp("received")} style={BS(tp==="received"?"#0f766e":T.border,tp==="received"?"#5eead4":T.mid,{flex:1,fontSize:12})}>📥 Received</button>
+        <button onClick={()=>setTp("issued")}   style={BS(tp==="issued"?"#7c1d1d":T.border,tp==="issued"?"#fca5a5":T.mid,{flex:1,fontSize:12})}>📤 Issued</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:8,marginBottom:8}}>
-        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Material name *" style={iStyle()}/>
-        <select value={unit} onChange={e=>setUnit(e.target.value)} style={iStyle()}>{UNITS.map(u=><option key={u}>{u}</option>)}</select>
-        <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={iStyle()}/>
+        <input value={nm} onChange={e=>setNm(e.target.value)} placeholder="Material name *" style={IS()}/>
+        <select value={u} onChange={e=>setU(e.target.value)} style={IS()}>{UNITS.map(x=><option key={x}>{x}</option>)}</select>
+        <input type="date" value={d} onChange={e=>setD(e.target.value)} style={IS()}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:10}}>
-        <input type="number" value={qty} onChange={e=>setQty(e.target.value)} placeholder="Qty *" style={iStyle({color:type==="received"?T.green:T.red,fontWeight:600})}/>
-        {type==="received"&&<input type="number" value={rate} onChange={e=>setRate(e.target.value)} placeholder="Rate/unit" style={iStyle()}/>}
-        {type==="received"&&<input value={supp} onChange={e=>setSupp(e.target.value)} placeholder="Supplier" style={iStyle()}/>}
-        <input value={note} onChange={e=>setNote(e.target.value)} placeholder="Note" style={iStyle()}/>
+        <input type="number" value={q} onChange={e=>setQ(e.target.value)} placeholder="Qty *" style={IS({color:tp==="received"?T.green:T.red,fontWeight:600})}/>
+        {tp==="received"&&<input type="number" value={r} onChange={e=>setR(e.target.value)} placeholder="Rate/unit" style={IS()}/>}
+        {tp==="received"&&<input value={s} onChange={e=>setS(e.target.value)} placeholder="Supplier" style={IS()}/>}
+        <input value={n} onChange={e=>setN(e.target.value)} placeholder="Note" style={IS()}/>
       </div>
-      <button onClick={go} disabled={!name.trim()||!qty} style={bStyle(type==="received"?"#0f766e":"#7c1d1d",type==="received"?"#5eead4":"#fca5a5",{width:"100%",padding:"9px",opacity:!name.trim()?.5:1})}>
-        {type==="received"?"📥 Record Receipt":"📤 Record Issue"}
+      <button onClick={go} disabled={!nm.trim()||!q} style={BS(tp==="received"?"#0f766e":"#7c1d1d",tp==="received"?"#5eead4":"#fca5a5",{width:"100%",padding:"9px",opacity:!nm.trim()?.5:1})}>
+        {tp==="received"?"📥 Record Receipt":"📤 Record Issue"}
       </button>
     </div>
   );
 }
 
-// ─── TASK PAGE ────────────────────────────────────────────────────────────────
-function TaskPage({task,name,taskData,perm,canEdit,onSave,onBack,onAddPay,onDelPay,onAddPhoto,onDelPhoto}){
-  const s=taskData,b=s.budget,canAdd=perm!=="payments_only";
+/* ════════════════ TASK PAGE ════════════════ */
+function TaskPage({task,name,td,perm,canEdit,onSave,onBack,onAddPay,onDelPay,onAddPhoto,onDelPhoto}){
+  const b=td.budget, canAdd=perm!=="payments_only";
   const pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0;
-  const [status,setStatus]=useState(s.status); const [prog,setProg]=useState(s.progress); const [notes,setNotes]=useState(s.notes||"");
-  const [budget,setBudget]=useState(b.total||""); const [cName,setCName]=useState(s.contractor.name||""); const [cPhone,setCPhone]=useState(s.contractor.phone||""); const [cCo,setCCo]=useState(s.contractor.co||"");
-  const [pAmt,setPAmt]=useState(""); const [pDate,setPDate]=useState(tday()); const [pMeth,setPMeth]=useState("Cash"); const [pNote,setPNote]=useState(""); const [pType,setPType]=useState("Payment");
-  const [cap,setCap]=useState(""); const [lb,setLb]=useState(null); const [aiTxt,setAiTxt]=useState(""); const [aiLd,setAiLd]=useState(false);
+  const [st,setSt]=useState(td.status); const [pr,setPr]=useState(td.progress); const [nt,setNt]=useState(td.notes||"");
+  const [bg,setBg]=useState(b.total||""); const [cn,setCn]=useState(td.contractor.name||""); const [cp,setCp]=useState(td.contractor.phone||""); const [cc,setCc]=useState(td.contractor.co||"");
+  const [pa,setPa]=useState(""); const [pd,setPd]=useState(today()); const [pm,setPm]=useState("Cash"); const [pn,setPn]=useState(""); const [pt,setPt]=useState("Payment");
+  const [cap,setCap]=useState(""); const [lb,setLb]=useState(null); const [ai,setAi]=useState(""); const [aiLd,setAiLd]=useState(false);
   const fRef=useRef();
-  function doSave(){ onSave({status,prog,notes,budget:Number(budget)||0,contractor:{name:cName,phone:cPhone,co:cCo}}); }
-  function doPay(){ const a=Number(pAmt); if(!a||a<=0) return; onAddPay({amount:a,date:pDate,method:pMeth,note:pNote,type:pType}); setPAmt(""); setPNote(""); }
-  function doPhoto(e){ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ onAddPhoto({data:ev.target.result,caption:cap||f.name,size:Math.round(f.size/1024)+"KB"}); setCap(""); e.target.value=""; }; r.readAsDataURL(f); }
+  function doSave(){ onSave({status:st,prog:pr,notes:nt,budget:Number(bg)||0,contractor:{name:cn,phone:cp,co:cc}}); }
+  function doPay(){ const a=Number(pa); if(!a||a<=0)return; onAddPay({amount:a,date:pd,method:pm,note:pn,type:pt}); setPa(""); setPn(""); }
+  function doPhoto(e){ const f=e.target.files?.[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{ onAddPhoto({data:ev.target.result,caption:cap||f.name,size:Math.round(f.size/1024)+"KB"}); setCap(""); e.target.value=""; }; r.readAsDataURL(f); }
   async function doAI(){
-    setAiLd(true); setAiTxt("");
+    setAiLd(true); setAi("");
     try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:900,system:"Senior construction PM Lahore. Concise bullets.",messages:[{role:"user",content:"Task: "+name+" ["+task.priority+"] "+task.ref+"\nStatus:"+s.status+" "+s.progress+"%\nBudget:PKR"+fmtM(b.total)+" Paid:PKR"+fmtM(b.paid)+"\n\nGive: 1.⚡ Actions 2.🔍 Checks 3.💰 Budget tips 4.⏱ Timeline 5.🔗 Dependencies"}]})});
-      const d=await r.json(); setAiTxt(d.error?"⚠️ "+d.error.message:d.content?.map(c=>c.text||"").join("")||"No response.");
-    }catch(e){ setAiTxt("⚠️ "+e.message); }
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:900,system:"Senior construction PM Lahore. Concise bullets.",messages:[{role:"user",content:"Task:"+name+" ["+task.priority+"] "+task.ref+"\nStatus:"+td.status+" "+td.progress+"%\nBudget:PKR"+fmtM(b.total)+" Paid:PKR"+fmtM(b.paid)+"\n\n1.⚡ Actions 2.🔍 Checks 3.💰 Budget 4.⏱ Timeline 5.🔗 Dependencies"}]})});
+      const d=await r.json(); setAi(d.error?"⚠️ "+d.error.message:d.content?.map(c=>c.text||"").join("")||"No response.");
+    }catch(e){ setAi("⚠️ "+e.message); }
     setAiLd(false);
   }
   return(
@@ -202,102 +246,104 @@ function TaskPage({task,name,taskData,perm,canEdit,onSave,onBack,onAddPay,onDelP
       {lb&&<div onClick={()=>setLb(null)} style={{position:"fixed",inset:0,background:"#000c",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
         <div onClick={e=>e.stopPropagation()} style={{background:T.panel,borderRadius:12,overflow:"hidden",maxWidth:700,width:"100%"}}>
           <img src={lb.data} alt={lb.caption} style={{width:"100%",maxHeight:"70vh",objectFit:"contain",display:"block"}}/>
-          <div style={{padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div><div style={{fontSize:13,color:T.hi}}>{lb.caption}</div><div style={{fontSize:10,color:T.dim,marginTop:2}}>{lb.by} · {lb.size}</div></div>
-            <button onClick={()=>setLb(null)} style={bStyle(T.border,T.mid,{fontSize:11})}>✕ Close</button>
+          <div style={{padding:"12px 16px",display:"flex",justifyContent:"space-between"}}>
+            <div><div style={{fontSize:13,color:T.hi}}>{lb.caption}</div><div style={{fontSize:10,color:T.dim}}>{lb.by} · {lb.size}</div></div>
+            <button onClick={()=>setLb(null)} style={BS(T.border,T.mid,{fontSize:11})}>✕ Close</button>
           </div>
         </div>
       </div>}
       <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:14,padding:20}}>
+        {/* header */}
         <div style={{display:"flex",gap:12,marginBottom:14,paddingBottom:12,borderBottom:"1px solid "+T.border}}>
           <span style={{fontSize:32}}>{task.icon}</span>
           <div style={{flex:1}}>
             <div style={{fontSize:17,color:T.hi,fontWeight:700,marginBottom:2}}>{name}</div>
             <div style={{fontSize:11,color:T.dim,marginBottom:5}}>{task.cat} · {task.ref}</div>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{task.floors.map(f=><span key={f} style={chip("#38bdf8")}>{f}</span>)}<span style={chip(PRICOLOR[task.priority])}>{task.priority}</span>{s.updatedBy&&<span style={{fontSize:10,color:T.dim}}>· {s.updatedBy}</span>}</div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{task.floors.map(f=><span key={f} style={CH("#38bdf8")}>{f}</span>)}<span style={CH(PRICLR[task.priority])}>{task.priority}</span>{td.updatedBy&&<span style={{fontSize:10,color:T.dim}}>· {td.updatedBy}</span>}</div>
           </div>
         </div>
+        {/* specs */}
         <div style={{background:T.bg,border:"1px solid "+T.border,borderRadius:10,padding:"10px 14px",marginBottom:14}}>
-          <div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>Specifications</div>
+          {LB("Specifications")}
           {task.details.map((d,i)=><div key={i} style={{fontSize:12,color:T.dim,lineHeight:1.7}}>• {d}</div>)}
           <div style={{marginTop:7,paddingTop:7,borderTop:"1px solid "+T.border,fontSize:11,color:"#334155"}}>📐 {task.scope}</div>
         </div>
+        {/* status + progress */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
           <div>
-            <div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>Status</div>
+            {LB("Status")}
             {Object.entries(STATUS).map(([k,v])=>(
-              <button key={k} onClick={()=>canEdit&&setStatus(k)} style={{background:status===k?v.color+"22":"transparent",color:status===k?v.color:T.mid,border:"1px solid "+(status===k?v.color:T.border),borderRadius:8,fontSize:12,display:"block",width:"100%",textAlign:"left",marginBottom:4,padding:"7px 10px",cursor:canEdit?"pointer":"default",opacity:canEdit?1:.65,fontFamily:"inherit",fontWeight:500}}>{v.label}</button>
+              <button key={k} onClick={()=>canEdit&&setSt(k)} style={{background:st===k?v.color+"22":"transparent",color:st===k?v.color:T.mid,border:"1px solid "+(st===k?v.color:T.border),borderRadius:8,fontSize:12,display:"block",width:"100%",textAlign:"left",marginBottom:4,padding:"7px 10px",cursor:canEdit?"pointer":"default",opacity:canEdit?1:.65,fontFamily:"inherit",fontWeight:500}}>{v.label}</button>
             ))}
           </div>
           <div>
-            <div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>Progress — {prog}%</div>
-            <div style={{height:6,background:T.border,borderRadius:99,overflow:"hidden",marginBottom:8}}><div style={{height:"100%",width:prog+"%",background:T.amber,borderRadius:99}}/></div>
-            <input type="range" min={0} max={100} value={prog} onChange={e=>canEdit&&setProg(+e.target.value)} disabled={!canEdit} style={{marginBottom:12,accentColor:T.amber,opacity:canEdit?1:.5}}/>
-            <div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>Site Notes</div>
-            <textarea value={notes} onChange={e=>canEdit&&setNotes(e.target.value)} readOnly={!canEdit} rows={4} placeholder={canEdit?"Issues, observations…":"View only — Omer can edit"} style={{...iStyle(),resize:"vertical",lineHeight:1.6,opacity:canEdit?1:.7}}/>
+            {LB("Progress — "+pr+"%")}
+            <div style={{height:6,background:T.border,borderRadius:99,overflow:"hidden",marginBottom:8}}><div style={{height:"100%",width:pr+"%",background:T.amber,borderRadius:99}}/></div>
+            <input type="range" min={0} max={100} value={pr} onChange={e=>canEdit&&setPr(+e.target.value)} disabled={!canEdit} style={{marginBottom:12,accentColor:T.amber,opacity:canEdit?1:.5}}/>
+            {LB("Site Notes")}
+            <textarea value={nt} onChange={e=>canEdit&&setNt(e.target.value)} readOnly={!canEdit} rows={4} placeholder={canEdit?"Issues, observations…":"View only — Omer can edit"} style={{...IS(),resize:"vertical",lineHeight:1.6,opacity:canEdit?1:.7}}/>
           </div>
         </div>
+        {/* contractor */}
         <div style={{background:T.bg,border:"1px solid "+T.border,borderRadius:10,padding:"12px 14px",marginBottom:14}}>
-          <div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:8,fontWeight:600}}>👷 Contractor / Vendor</div>
+          {LB("👷 Contractor / Vendor")}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-            <input value={cName}  onChange={e=>canEdit&&setCName(e.target.value)}  readOnly={!canEdit} placeholder="Name"    style={iStyle({fontSize:12,opacity:canEdit?1:.7})}/>
-            <input value={cPhone} onChange={e=>canEdit&&setCPhone(e.target.value)} readOnly={!canEdit} placeholder="Phone"   style={iStyle({fontSize:12,opacity:canEdit?1:.7})}/>
-            <input value={cCo}    onChange={e=>canEdit&&setCCo(e.target.value)}    readOnly={!canEdit} placeholder="Company" style={iStyle({fontSize:12,opacity:canEdit?1:.7})}/>
+            <input value={cn} onChange={e=>canEdit&&setCn(e.target.value)} readOnly={!canEdit} placeholder="Name"    style={IS({fontSize:12,opacity:canEdit?1:.7})}/>
+            <input value={cp} onChange={e=>canEdit&&setCp(e.target.value)} readOnly={!canEdit} placeholder="Phone"   style={IS({fontSize:12,opacity:canEdit?1:.7})}/>
+            <input value={cc} onChange={e=>canEdit&&setCc(e.target.value)} readOnly={!canEdit} placeholder="Company" style={IS({fontSize:12,opacity:canEdit?1:.7})}/>
           </div>
         </div>
+        {/* payments */}
         <div style={{background:T.bg,border:"1px solid #14532d66",borderRadius:12,padding:16,marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{fontSize:13,color:"#86efac",fontWeight:700}}>💳 PAYMENTS</div><div style={{fontSize:11,color:T.mid}}>{(b.payments||[]).length} txns</div></div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:b.total>0?10:14}}>
             {[{l:"Budget",v:b.total>0?fmt(b.total):"Not set",c:"#38bdf8"},{l:"Paid",v:fmt(b.paid),c:T.green},{l:"Remaining",v:b.total>0?fmt(b.total-b.paid):"—",c:T.amber},{l:"% Paid",v:b.total>0?pp+"%":"—",c:pp>=100?T.red:T.green}].map(x=>(<div key={x.l} style={{background:T.panel,borderRadius:8,padding:"8px 10px",textAlign:"center",border:"1px solid "+T.border}}><div style={{fontSize:9,color:T.dim,textTransform:"uppercase",marginBottom:2}}>{x.l}</div><div style={{fontSize:12,fontWeight:700,color:x.c}}>{x.v}</div></div>))}
           </div>
           {b.total>0&&<div style={{height:7,background:T.border,borderRadius:99,overflow:"hidden",marginBottom:14}}><div style={{height:"100%",width:pp+"%",background:pp>=100?"#ef4444":"#22c55e",borderRadius:99}}/></div>}
-          {canEdit&&<><div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>Budget Estimate (PKR)</div><input type="number" value={budget} onChange={e=>setBudget(e.target.value)} placeholder="Enter total budget…" style={iStyle({marginBottom:12})}/></>}
+          {canEdit&&<>{LB("Budget Estimate (PKR)")}<input type="number" value={bg} onChange={e=>setBg(e.target.value)} placeholder="Enter total budget…" style={IS({marginBottom:12})}/></>}
           {canAdd&&<div style={{borderTop:"1px solid "+T.border,paddingTop:12,marginBottom:12}}>
-            <div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:8,fontWeight:600}}>Record Payment</div>
+            {LB("Record Payment")}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-              <input type="number" value={pAmt}  onChange={e=>setPAmt(e.target.value)}  placeholder="Amount (PKR) *" style={iStyle({color:T.green,fontWeight:600})}/>
-              <input type="date"   value={pDate} onChange={e=>setPDate(e.target.value)} style={iStyle()}/>
+              <input type="number" value={pa} onChange={e=>setPa(e.target.value)} placeholder="Amount (PKR) *" style={IS({color:T.green,fontWeight:600})}/>
+              <input type="date"   value={pd} onChange={e=>setPd(e.target.value)} style={IS()}/>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-              <select value={pMeth} onChange={e=>setPMeth(e.target.value)} style={iStyle()}>{METHODS.map(m=><option key={m}>{m}</option>)}</select>
-              <select value={pType} onChange={e=>setPType(e.target.value)} style={iStyle()}>{["Payment","Advance","Retention","Labour","Material"].map(t=><option key={t}>{t}</option>)}</select>
-              <input  value={pNote} onChange={e=>setPNote(e.target.value)} placeholder="Note…" style={iStyle()}/>
+              <select value={pm} onChange={e=>setPm(e.target.value)} style={IS()}>{METHODS.map(x=><option key={x}>{x}</option>)}</select>
+              <select value={pt} onChange={e=>setPt(e.target.value)} style={IS()}>{["Payment","Advance","Retention","Labour","Material"].map(x=><option key={x}>{x}</option>)}</select>
+              <input  value={pn} onChange={e=>setPn(e.target.value)} placeholder="Note…" style={IS()}/>
             </div>
-            <button onClick={doPay} disabled={!pAmt||Number(pAmt)<=0} style={bStyle("#14532d","#86efac",{width:"100%",padding:"9px",opacity:!pAmt||Number(pAmt)<=0?.5:1})}>+ Record Payment</button>
+            <button onClick={doPay} disabled={!pa||Number(pa)<=0} style={BS("#14532d","#86efac",{width:"100%",padding:"9px",opacity:!pa||Number(pa)<=0?.5:1})}>+ Record Payment</button>
           </div>}
           {(b.payments||[]).length>0&&<div style={{maxHeight:180,overflowY:"auto"}}>{(b.payments||[]).map(p=>(<div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:T.panel,borderRadius:8,marginBottom:4,border:"1px solid "+T.border}}>
-            <div><div style={{display:"flex",gap:5}}><span style={chip("#a78bfa")}>{p.type}</span><span style={chip("#64748b")}>{p.method}</span></div><div style={{fontSize:10,color:T.dim,marginTop:2}}>{p.date} · {p.by}{p.note?" · "+p.note:""}</div></div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:13,color:T.green,fontWeight:700}}>{fmt(p.amount)}</span>{canEdit&&<button onClick={()=>onDelPay(p.id)} style={bStyle("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
+            <div><div style={{display:"flex",gap:5}}><span style={CH("#a78bfa")}>{p.type}</span><span style={CH("#64748b")}>{p.method}</span></div><div style={{fontSize:10,color:T.dim,marginTop:2}}>{p.date} · {p.by}{p.note?" · "+p.note:""}</div></div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:13,color:T.green,fontWeight:700}}>{fmt(p.amount)}</span>{canEdit&&<button onClick={()=>onDelPay(p.id)} style={BS("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
           </div>))}</div>}
         </div>
+        {/* photos */}
         <div style={{background:T.bg,border:"1px solid #1e3a5f",borderRadius:12,padding:16,marginBottom:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><div style={{fontSize:13,color:"#93c5fd",fontWeight:700}}>📷 SITE PHOTOS</div><span style={{fontSize:11,color:T.mid}}>{(s.photos||[]).length} photos</span></div>
-          {canAdd&&<div style={{display:"flex",gap:8,marginBottom:12}}><input value={cap} onChange={e=>setCap(e.target.value)} placeholder="Caption…" style={iStyle({flex:1})}/><button onClick={()=>fRef.current?.click()} style={bStyle("#1e3a8a","#93c5fd",{whiteSpace:"nowrap"})}>📁 Upload</button><input ref={fRef} type="file" accept="image/*" style={{display:"none"}} onChange={doPhoto}/></div>}
-          {(s.photos||[]).length===0?<div style={{textAlign:"center",padding:"14px 0",color:T.dim,fontSize:12}}>No photos yet.</div>
-            :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8}}>{(s.photos||[]).map(p=>(<div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer"}} onClick={()=>setLb(p)}><img src={p.data} alt={p.caption} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/><div style={{padding:"5px 7px",background:T.panel}}><div style={{fontSize:9,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.caption}</div><div style={{fontSize:8,color:T.dim}}>{p.by} · {p.size}</div></div>{canEdit&&<button onClick={e=>{e.stopPropagation();onDelPhoto(p.id);}} style={{position:"absolute",top:4,right:4,background:"#000b",border:"none",borderRadius:99,width:20,height:20,color:"#fff",fontSize:10,cursor:"pointer"}}>✕</button>}</div>))}</div>}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><div style={{fontSize:13,color:"#93c5fd",fontWeight:700}}>📷 SITE PHOTOS</div><span style={{fontSize:11,color:T.mid}}>{(td.photos||[]).length} photos</span></div>
+          {canAdd&&<div style={{display:"flex",gap:8,marginBottom:12}}><input value={cap} onChange={e=>setCap(e.target.value)} placeholder="Caption…" style={IS({flex:1})}/><button onClick={()=>fRef.current?.click()} style={BS("#1e3a8a","#93c5fd",{whiteSpace:"nowrap"})}>📁 Upload</button><input ref={fRef} type="file" accept="image/*" style={{display:"none"}} onChange={doPhoto}/></div>}
+          {(td.photos||[]).length===0?<div style={{textAlign:"center",padding:"14px 0",color:T.dim,fontSize:12}}>No photos yet.</div>
+            :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8}}>{(td.photos||[]).map(p=>(<div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer"}} onClick={()=>setLb(p)}><img src={p.data} alt={p.caption} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/><div style={{padding:"5px 7px",background:T.panel}}><div style={{fontSize:9,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.caption}</div><div style={{fontSize:8,color:T.dim}}>{p.by} · {p.size}</div></div>{canEdit&&<button onClick={e=>{e.stopPropagation();onDelPhoto(p.id);}} style={{position:"absolute",top:4,right:4,background:"#000b",border:"none",borderRadius:99,width:20,height:20,color:"#fff",fontSize:10,cursor:"pointer"}}>✕</button>}</div>))}</div>}
         </div>
+        {/* actions */}
         <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-          {canEdit?<button onClick={doSave} style={bStyle("#1d4ed8")}>💾 Save Changes</button>:<div style={{fontSize:12,color:T.dim,padding:"8px 12px",background:T.bg,borderRadius:8,border:"1px solid "+T.border}}>🔒 View only — Omer can edit</div>}
-          <button onClick={doAI} disabled={aiLd} style={bStyle("#7c1d1d","#fca5a5",{opacity:aiLd?.7:1})}>{aiLd?"Analyzing…":"🤖 AI Advisor"}</button>
-          <button onClick={onBack} style={bStyle(T.border,T.mid)}>← Back</button>
+          {canEdit?<button onClick={doSave} style={BS("#1d4ed8")}>💾 Save Changes</button>:<div style={{fontSize:12,color:T.dim,padding:"8px 12px",background:T.bg,borderRadius:8,border:"1px solid "+T.border}}>🔒 View only — Omer can edit</div>}
+          <button onClick={doAI} disabled={aiLd} style={BS("#7c1d1d","#fca5a5",{opacity:aiLd?.7:1})}>{aiLd?"Analyzing…":"🤖 AI Advisor"}</button>
+          <button onClick={onBack} style={BS(T.border,T.mid)}>← Back</button>
         </div>
-        {(aiLd||aiTxt)&&<div style={{background:"#0a0d14",border:"1px solid #7c1d1d44",borderRadius:10,padding:14,marginBottom:14}}><div style={{fontSize:10,color:"#fb923c",letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>🤖 AI Advisor</div>{aiLd?<div style={{color:T.dim,fontSize:12}}>Analyzing…</div>:<div style={{fontSize:13,color:T.text,lineHeight:1.85,whiteSpace:"pre-wrap"}}>{aiTxt}</div>}</div>}
-        {(s.history||[]).length>0&&<div><div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>Update History</div><div style={{maxHeight:160,overflowY:"auto"}}>{(s.history||[]).map((h,i)=>(<div key={i} style={{borderLeft:"2px solid "+T.border,paddingLeft:10,marginBottom:7}}><div style={{fontSize:10,color:T.dim}}>{h.time} · <span style={{color:USERS.find(u=>u.name===h.who)?.color||T.mid}}>{h.who}</span> · <span style={{color:STATUS[h.status]?.color}}>{STATUS[h.status]?.label}</span> · {h.prog}%</div>{h.note&&<div style={{fontSize:11,color:"#1e3a5f",marginTop:1}}>{h.note}</div>}</div>))}</div></div>}
+        {(aiLd||ai)&&<div style={{background:"#0a0d14",border:"1px solid #7c1d1d44",borderRadius:10,padding:14,marginBottom:14}}>{LB("🤖 AI Advisor")}{aiLd?<div style={{color:T.dim,fontSize:12}}>Analyzing…</div>:<div style={{fontSize:13,color:T.text,lineHeight:1.85,whiteSpace:"pre-wrap"}}>{ai}</div>}</div>}
+        {(td.history||[]).length>0&&<div>{LB("Update History")}<div style={{maxHeight:160,overflowY:"auto"}}>{(td.history||[]).map((h,i)=>(<div key={i} style={{borderLeft:"2px solid "+T.border,paddingLeft:10,marginBottom:7}}><div style={{fontSize:10,color:T.dim}}>{h.time} · <span style={{color:USERS.find(u=>u.name===h.who)?.color||T.mid}}>{h.who}</span> · <span style={{color:STATUS[h.status]?.color}}>{STATUS[h.status]?.label}</span> · {h.prog}%</div>{h.note&&<div style={{fontSize:11,color:"#1e3a5f",marginTop:1}}>{h.note}</div>}</div>))}</div></div>}
       </div>
     </div>
   );
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// ROOT
-// ════════════════════════════════════════════════════════════════════════════
-function Root(){
+/* ════════════════ MAIN APP ════════════════ */
+function App(){
+  /* ── state ── */
   const [loading, setLoading] = useState(true);
-  const [loadMsg, setLoadMsg] = useState("Connecting to database…");
-  const [user,    setUser]    = useState(null);
-  const [pinSel,  setPinSel]  = useState(null);
-  const [pinVal,  setPinVal]  = useState("");
-  const [pinErr,  setPinErr]  = useState("");
+  const [user,    setUser]    = useState(null);   // null = show login
   const [data,    setData]    = useState(mkData);
   const [saveMsg, setSaveMsg] = useState("");
   const [saving,  setSaving]  = useState(false);
@@ -308,139 +354,76 @@ function Root(){
   const [matFilt, setMatFilt] = useState("All");
   const [fl,      setFl]      = useState("All");
   const [cat,     setCat]     = useState("All");
-  const [stFilt,  setStFilt]  = useState("All");
+  const [stF,     setStF]     = useState("All");
   const [srch,    setSrch]    = useState("");
   const [brief,   setBrief]   = useState("");
   const [briefLd, setBriefLd] = useState(false);
 
-  // load on mount
+  /* ── load on mount ── */
   useEffect(()=>{
-    (async()=>{
-      setLoadMsg("Loading project data…");
-      const saved = await dbLoad();
-      if(saved){
-        // merge with default to handle any new tasks
-        const merged = {...mkData(),...saved};
-        TASKS.forEach(t=>{ if(!merged.tasks[t.id]) merged.tasks[t.id]=mkData().tasks[t.id]; if(!merged.names[t.id]) merged.names[t.id]=t.name; });
-        setData(merged);
-      }
+    dbLoad().then(saved=>{
+      setData(mergeData(saved));
       setLoading(false);
-    })();
+    });
   },[]);
 
-  // save helper
-  const save = useCallback(async(newData)=>{
+  /* ── save helper ── */
+  const save = useCallback(async(d)=>{
     setSaving(true);
-    const ok = await dbSave(newData);
-    setSaveMsg(ok?"✓ Saved":"⚠ Save failed — check internet");
+    const ok=await dbSave(d);
+    setSaveMsg(ok?"✓ Saved":"⚠ Save failed");
     setTimeout(()=>setSaveMsg(""),3000);
     setSaving(false);
   },[]);
 
-  // mutate + save
+  /* ── mutate ── */
   const mut = useCallback(fn=>{
-    setData(prev=>{
-      const next=fn(prev);
-      save(next);
-      return next;
-    });
+    setData(prev=>{ const next=fn(prev); save(next); return next; });
   },[save]);
 
+  /* ── addLog (safe — takes user object directly) ── */
   function addLog(u,action,detail){
-    const entry={id:Date.now(),time:ts(),who:u.name,wid:u.id,action,detail:detail||""};
-    mut(prev=>({...prev,log:[entry,...(prev.log||[]).slice(0,199)]}));
+    if(!u) return;
+    const entry={id:Date.now(),time:now(),who:u.name,wid:u.id,action,detail:detail||""};
+    setData(prev=>{ const next={...prev,log:[entry,...(prev.log||[]).slice(0,199)]}; save(next); return next; });
   }
 
-  // login
-  function selectUser(u){
-    if(u.pin===null){
-      setUser(u); setPage("dashboard");
-      const entry={id:Date.now(),time:ts(),who:u.name,wid:u.id,action:"Login",detail:u.name+" in"};
-      mut(prev=>({...prev,log:[entry,...(prev.log||[]).slice(0,199)]}));
-    } else { setPinSel(u); setPinVal(""); setPinErr(""); }
-  }
-
-  function tryPin(){
-    if(!pinSel) return;
-    if(pinVal===pinSel.pin){
-      const u=pinSel;
-      setUser(u); setPage(u.perm==="payments_only"?"payments":"dashboard");
-      setPinSel(null); setPinVal("");
-      const entry={id:Date.now(),time:ts(),who:u.name,wid:u.id,action:"Login",detail:u.name+" in"};
-      mut(prev=>({...prev,log:[entry,...(prev.log||[]).slice(0,199)]}));
-    } else { setPinErr("Incorrect PIN"); setPinVal(""); }
-  }
-
-  function logout(){ setUser(null); setPinSel(null); setPinVal(""); setPinErr(""); setPage("dashboard"); }
-
-  // refresh data from server
+  /* ── refresh ── */
   async function refresh(){
     setSaveMsg("🔄 Refreshing…");
     const saved=await dbLoad();
-    if(saved){
-      const merged={...mkData(),...saved};
-      TASKS.forEach(t=>{ if(!merged.tasks[t.id]) merged.tasks[t.id]=mkData().tasks[t.id]; if(!merged.names[t.id]) merged.names[t.id]=t.name; });
-      setData(merged);
-    }
+    setData(mergeData(saved));
     setSaveMsg("✓ Refreshed");
     setTimeout(()=>setSaveMsg(""),2000);
   }
 
-  // ── loading screen ────────────────────────────────────────────────────────
-  if(loading){
-    return(
-      <div style={{minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
-        <div style={{fontSize:48}}>🏡</div>
-        <div style={{fontSize:18,color:T.hi,fontWeight:700}}>Valencia 116-D</div>
-        <div style={{fontSize:13,color:T.mid}}>{loadMsg}</div>
-        <div style={{width:48,height:48,border:"4px solid "+T.border,borderTopColor:"#a78bfa",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
-      </div>
-    );
+  /* ── LOGIN HANDLER — no state dependency, completely safe ── */
+  function handleLogin(u){
+    // 1. set user state
+    setUser(u);
+    // 2. set page
+    setPage(u.perm==="payments_only"?"payments":"dashboard");
+    // 3. log directly into data without going through mut/addLog
+    const entry={id:Date.now(),time:now(),who:u.name,wid:u.id,action:"Login",detail:u.name+" logged in"};
+    setData(prev=>{ const next={...prev,log:[entry,...(prev.log||[]).slice(0,199)]}; save(next); return next; });
   }
 
-  // ── login screen ──────────────────────────────────────────────────────────
-  if(!user){
-    return(
-      <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:18,padding:40,width:340,textAlign:"center",boxShadow:"0 24px 64px #00000088"}}>
-          <div style={{fontSize:48,marginBottom:10}}>🏡</div>
-          <div style={{fontSize:20,color:T.hi,fontWeight:700,marginBottom:4}}>Valencia 116-D</div>
-          <div style={{fontSize:12,color:T.mid,marginBottom:4}}>{PROJECT.name}</div>
-          <div style={{fontSize:11,color:T.dim,marginBottom:28}}>{PROJECT.plotSize} · {PROJECT.totalArea}</div>
-          {!pinSel?(
-            <>
-              <div style={{fontSize:11,color:T.mid,marginBottom:14,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600}}>Select Profile</div>
-              {USERS.map(u=>(
-                <button key={u.id} onClick={()=>selectUser(u)}
-                  style={{width:"100%",marginBottom:10,padding:"14px 16px",textAlign:"left",display:"flex",alignItems:"center",gap:14,border:"1px solid "+T.border,borderRadius:12,background:T.border,cursor:"pointer",fontFamily:"inherit"}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor=u.color;e.currentTarget.style.background=u.color+"22";}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.border;}}>
-                  <span style={{fontSize:26}}>{u.icon}</span>
-                  <div style={{flex:1,textAlign:"left"}}><div style={{fontSize:14,color:T.hi,fontWeight:600}}>{u.name}</div><div style={{fontSize:11,color:u.color,marginTop:2}}>{u.role}</div></div>
-                  <span style={{fontSize:12,color:T.dim}}>{u.pin?"🔒":"→"}</span>
-                </button>
-              ))}
-            </>
-          ):(
-            <>
-              <div style={{fontSize:28,marginBottom:6}}>{pinSel.icon}</div>
-              <div style={{fontSize:15,color:T.hi,fontWeight:600,marginBottom:2}}>{pinSel.name}</div>
-              <div style={{fontSize:11,color:pinSel.color,marginBottom:20}}>{pinSel.role}</div>
-              <div style={{fontSize:10,color:T.mid,letterSpacing:1.5,textTransform:"uppercase",marginBottom:8,fontWeight:600}}>Enter PIN</div>
-              <input type="password" value={pinVal} maxLength={6} autoFocus onChange={e=>setPinVal(e.target.value)} onKeyDown={e=>e.key==="Enter"&&tryPin()} placeholder="••••" style={iStyle({textAlign:"center",fontSize:24,letterSpacing:10,marginBottom:8,padding:"12px"})}/>
-              {pinErr&&<div style={{fontSize:11,color:T.red,marginBottom:8}}>{pinErr}</div>}
-              <div style={{display:"flex",gap:8,marginTop:8}}>
-                <button onClick={()=>setPinSel(null)} style={bStyle(T.border,T.mid,{flex:1})}>← Back</button>
-                <button onClick={tryPin} style={bStyle(pinSel.color,"#000",{flex:1,fontWeight:700})}>Login</button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
+  function handleLogout(){ setUser(null); setPage("dashboard"); }
 
-  // ── derived ───────────────────────────────────────────────────────────────
+  /* ── LOADING SCREEN ── */
+  if(loading) return(
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+      <div style={{fontSize:48}}>🏡</div>
+      <div style={{fontSize:18,color:T.hi,fontWeight:700}}>Valencia 116-D</div>
+      <div style={{fontSize:13,color:T.mid}}>Loading project data…</div>
+      <div style={{width:48,height:48,border:"4px solid "+T.border,borderTopColor:"#a78bfa",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+    </div>
+  );
+
+  /* ── LOGIN SCREEN ── */
+  if(!user) return <LoginScreen onLogin={handleLogin}/>;
+
+  /* ── DERIVED ── */
   const canEdit  = user.perm==="all";
   const isOffice = user.perm==="payments_only";
   const totBudget= Object.values(data.tasks).reduce((s,t)=>s+(t.budget.total||0),0);
@@ -450,32 +433,32 @@ function Root(){
   const cnts={done:0,active:0,blocked:0};
   Object.values(data.tasks).forEach(t=>{ if(t.status==="completed")cnts.done++; else if(t.status==="in-progress")cnts.active++; else if(t.status==="blocked")cnts.blocked++; });
   const allPays=TASKS.flatMap(t=>(data.tasks[t.id].budget.payments||[]).map(p=>({...p,tid:t.id,tname:data.names[t.id],ticon:t.icon}))).sort((a,b)=>b.id-a.id);
-  const matStock=useMemo(()=>{ const m={}; (data.mats||[]).forEach(x=>{ if(!m[x.name]) m[x.name]={name:x.name,unit:x.unit,in:0,out:0,val:0}; if(x.type==="received"){m[x.name].in+=x.qty;m[x.name].val+=x.qty*(x.rate||0);}else m[x.name].out+=x.qty; }); return Object.values(m).map(x=>({...x,bal:x.in-x.out})); },[data.mats]);
-  const visTasks=TASKS.filter(t=>{ if(fl!=="All"&&!t.floors.includes(fl)) return false; if(cat!=="All"&&t.cat!==cat) return false; if(stFilt!=="All"&&data.tasks[t.id].status!==stFilt) return false; if(srch&&!(data.names[t.id]||"").toLowerCase().includes(srch.toLowerCase())) return false; return true; });
+  const matStock=useMemo(()=>{ const m={}; (data.mats||[]).forEach(x=>{ if(!m[x.name]) m[x.name]={name:x.name,unit:x.unit,i:0,o:0,v:0}; if(x.type==="received"){m[x.name].i+=x.qty;m[x.name].v+=x.qty*(x.rate||0);}else m[x.name].o+=x.qty; }); return Object.values(m).map(x=>({...x,bal:x.i-x.o})); },[data.mats]);
+  const visTasks=TASKS.filter(t=>{ if(fl!=="All"&&!t.floors.includes(fl))return false; if(cat!=="All"&&t.cat!==cat)return false; if(stF!=="All"&&data.tasks[t.id].status!==stF)return false; if(srch&&!(data.names[t.id]||"").toLowerCase().includes(srch.toLowerCase()))return false; return true; });
   const activeTask=tid?TASKS.find(t=>t.id===tid):null;
 
-  // mutations
+  /* ── MUTATIONS ── */
   function saveTask(id,d){
-    const now=ts();
-    mut(prev=>({...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],status:d.status,progress:d.prog,notes:d.notes,updatedBy:user.name,updatedAt:now,budget:{...prev.tasks[id].budget,total:d.budget},contractor:d.contractor,history:[{time:now,who:user.name,status:d.status,prog:d.prog,note:d.notes},...(prev.tasks[id].history||[]).slice(0,19)]}}}));
+    const n=now();
+    mut(prev=>({...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],status:d.status,progress:d.prog,notes:d.notes,updatedBy:user.name,updatedAt:n,budget:{...prev.tasks[id].budget,total:d.budget},contractor:d.contractor,history:[{time:n,who:user.name,status:d.status,prog:d.prog,note:d.notes},...(prev.tasks[id].history||[]).slice(0,19)]}}}));
     addLog(user,"Task Updated",data.names[id]+" → "+d.status+" "+d.prog+"%");
     setPage("dashboard");
   }
-  function addPay(id,p){ mut(prev=>{ const b=prev.tasks[id].budget; const pays=[{id:Date.now(),...p,by:user.name,at:ts()},...(b.payments||[])]; return{...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],budget:{...b,paid:pays.reduce((s,x)=>s+x.amount,0),payments:pays}}}}; }); addLog(user,"Payment","PKR"+fmtM(p.amount)+" "+data.names[id]); }
-  function delPay(tid,pid){ if(!canEdit) return; mut(prev=>{ const b=prev.tasks[tid].budget; const pays=(b.payments||[]).filter(p=>p.id!==pid); return{...prev,tasks:{...prev.tasks,[tid]:{...prev.tasks[tid],budget:{...b,paid:pays.reduce((s,p)=>s+p.amount,0),payments:pays}}}}; }); }
-  function addPhoto(id,p){ mut(prev=>({...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],photos:[{id:Date.now(),...p,by:user.name,at:ts()},...(prev.tasks[id].photos||[])]}}})); addLog(user,"Photo Added",data.names[id]); }
-  function delPhoto(id,pid){ if(!canEdit) return; mut(prev=>({...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],photos:(prev.tasks[id].photos||[]).filter(p=>p.id!==pid)}}})); }
-  function saveName(id,name){ if(!canEdit) return; mut(prev=>({...prev,names:{...prev.names,[id]:name}})); addLog(user,"Renamed","→ "+name); }
-  function addLabour(l){ mut(prev=>({...prev,labour:[{id:Date.now(),...l,by:user.name,at:ts()},...(prev.labour||[])]})); addLog(user,"Labour","PKR"+fmtM(l.amount)+" "+l.work); }
-  function delLabour(id){ if(!canEdit) return; mut(prev=>({...prev,labour:(prev.labour||[]).filter(l=>l.id!==id)})); }
-  function addMat(m){ mut(prev=>({...prev,mats:[{id:Date.now(),...m,by:user.name,at:ts()},...(prev.mats||[])]})); addLog(user,"Material "+m.type,m.qty+" "+m.unit+" "+m.name); }
-  function delMat(id){ if(!canEdit) return; mut(prev=>({...prev,mats:(prev.mats||[]).filter(m=>m.id!==id)})); }
+  function addPay(id,p){ mut(prev=>{ const b=prev.tasks[id].budget; const pays=[{id:Date.now(),...p,by:user.name,at:now()},...(b.payments||[])]; return{...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],budget:{...b,paid:pays.reduce((s,x)=>s+x.amount,0),payments:pays}}}}; }); addLog(user,"Payment","PKR"+fmtM(p.amount)+" "+data.names[id]); }
+  function delPay(tid,pid){ if(!canEdit)return; mut(prev=>{ const b=prev.tasks[tid].budget; const pays=(b.payments||[]).filter(p=>p.id!==pid); return{...prev,tasks:{...prev.tasks,[tid]:{...prev.tasks[tid],budget:{...b,paid:pays.reduce((s,p)=>s+p.amount,0),payments:pays}}}}; }); }
+  function addPhoto(id,p){ mut(prev=>({...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],photos:[{id:Date.now(),...p,by:user.name,at:now()},...(prev.tasks[id].photos||[])]}}})); addLog(user,"Photo Added",data.names[id]); }
+  function delPhoto(id,pid){ if(!canEdit)return; mut(prev=>({...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],photos:(prev.tasks[id].photos||[]).filter(p=>p.id!==pid)}}})); }
+  function saveName(id,name){ if(!canEdit)return; mut(prev=>({...prev,names:{...prev.names,[id]:name}})); addLog(user,"Renamed","→ "+name); }
+  function addLabour(l){ mut(prev=>({...prev,labour:[{id:Date.now(),...l,by:user.name,at:now()},...(prev.labour||[])]})); addLog(user,"Labour","PKR"+fmtM(l.amount)+" "+l.work); }
+  function delLabour(id){ if(!canEdit)return; mut(prev=>({...prev,labour:(prev.labour||[]).filter(l=>l.id!==id)})); }
+  function addMat(m){ mut(prev=>({...prev,mats:[{id:Date.now(),...m,by:user.name,at:now()},...(prev.mats||[])]})); addLog(user,"Material "+m.type,m.qty+" "+m.unit+" "+m.name); }
+  function delMat(id){ if(!canEdit)return; mut(prev=>({...prev,mats:(prev.mats||[]).filter(m=>m.id!==id)})); }
 
   async function getBrief(){
     setBrief(""); setBriefLd(true); setPage("briefing");
     const sum=TASKS.map(t=>{ const s=data.tasks[t.id],b=s.budget; return data.names[t.id]+"["+t.priority+"]:"+s.status+"("+s.progress+"%)B:"+fmtM(b.total)+"P:"+fmtM(b.paid); }).join("\n");
     try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1400,system:"Senior construction PM briefing for luxury home in Lahore. Structured, emoji-rich, actionable.",messages:[{role:"user",content:"Project: "+PROJECT.name+"\nBudget:PKR"+fmtM(totBudget)+" Paid:PKR"+fmtM(totPaid)+" Labour:PKR"+fmtM(totLabour)+"\n\n"+sum+"\n\nDeliver: 1.📊 Health 2.🔴 Urgent 3.✅ Top 3 TODAY 4.💰 Finance 5.📅 Timeline"}]})});
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1400,system:"Senior construction PM briefing luxury home Lahore. Structured emoji-rich actionable.",messages:[{role:"user",content:"Project:"+PROJECT.name+"\nBudget:PKR"+fmtM(totBudget)+" Paid:PKR"+fmtM(totPaid)+" Labour:PKR"+fmtM(totLabour)+"\n\n"+sum+"\n\n1.📊 Health 2.🔴 Urgent 3.✅ Top 3 TODAY 4.💰 Finance 5.📅 Timeline"}]})});
       const d=await r.json(); setBrief(d.error?"⚠️ "+d.error.message:d.content?.map(c=>c.text||"").join("")||"No response.");
     }catch(e){ setBrief("⚠️ "+e.message); }
     setBriefLd(false);
@@ -483,6 +466,7 @@ function Root(){
 
   const navPages=[["dashboard","📋 Tasks"],["payments","💳 Payments"],["analytics","📈 Analytics"],["log","📜 Activity"],["briefing","🤖 AI"]].filter(([p])=>isOffice?p==="payments":true);
 
+  /* ── NAV ── */
   function Nav(){
     return(
       <div style={{background:T.panel,borderBottom:"1px solid "+T.border,padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
@@ -494,12 +478,12 @@ function Root(){
               <div style={{fontSize:11,color:T.dim}}>{PROJECT.client} · {PROJECT.plotSize} · {PROJECT.totalArea}</div>
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-              {navPages.map(([p,l])=>(<button key={p} onClick={p==="briefing"?getBrief:()=>setPage(p)} style={bStyle(page===p?"#1d4ed8":T.border,page===p?"#fff":T.mid,{fontSize:11})}>{l}</button>))}
-              <button onClick={refresh} title="Refresh data from server" style={bStyle(T.border,T.mid,{fontSize:11,padding:"8px 10px"})}>🔄</button>
+              {navPages.map(([p,l])=><button key={p} onClick={p==="briefing"?getBrief:()=>setPage(p)} style={BS(page===p?"#1d4ed8":T.border,page===p?"#fff":T.mid,{fontSize:11})}>{l}</button>)}
+              <button onClick={refresh} title="Refresh data" style={BS(T.border,T.mid,{fontSize:11,padding:"8px 10px"})}>🔄</button>
               <div style={{display:"flex",alignItems:"center",gap:6,background:T.bg,border:"1px solid "+user.color+"44",borderRadius:8,padding:"5px 10px"}}>
                 <span style={{fontSize:14}}>{user.icon}</span>
                 <div><div style={{fontSize:12,color:user.color,fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:T.dim}}>{user.role}</div></div>
-                <button onClick={logout} style={bStyle("transparent",T.dim,{fontSize:10,padding:"2px 6px"})}>⏏</button>
+                <button onClick={handleLogout} style={BS("transparent",T.dim,{fontSize:10,padding:"2px 6px"})}>⏏</button>
               </div>
               {(saveMsg||saving)&&<span style={{fontSize:10,color:saving?T.amber:saveMsg.startsWith("✓")?T.green:T.red,fontWeight:600}}>{saving?"Saving…":saveMsg}</span>}
             </div>
@@ -513,15 +497,16 @@ function Root(){
     );
   }
 
+  /* ── DASHBOARD ── */
   function Dashboard(){
     return(
       <div style={{maxWidth:1060,margin:"0 auto",padding:16}}>
         <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:"12px 14px",marginBottom:14}}>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-            <input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="🔍 Search…" style={iStyle({width:150,fontSize:12})}/>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{FLOORS.map(f=><button key={f} onClick={()=>setFl(f)} style={bStyle(fl===f?"#1e3a5f":T.border,fl===f?"#93c5fd":T.mid,{fontSize:10})}>{f}</button>)}</div>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={bStyle(cat===c?"#14532d":T.border,cat===c?"#86efac":T.mid,{fontSize:10})}>{c}</button>)}</div>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{["All","not-started","in-progress","completed","blocked"].map(s=><button key={s} onClick={()=>setStFilt(s)} style={bStyle(stFilt===s?(STATUS[s]?.color+"33"||T.border):T.border,stFilt===s?(STATUS[s]?.color||T.mid):T.mid,{fontSize:10})}>{s==="All"?"All":STATUS[s]?.label}</button>)}</div>
+            <input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="🔍 Search…" style={IS({width:150,fontSize:12})}/>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{FLOORS.map(f=><button key={f} onClick={()=>setFl(f)} style={BS(fl===f?"#1e3a5f":T.border,fl===f?"#93c5fd":T.mid,{fontSize:10})}>{f}</button>)}</div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={BS(cat===c?"#14532d":T.border,cat===c?"#86efac":T.mid,{fontSize:10})}>{c}</button>)}</div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{["All","not-started","in-progress","completed","blocked"].map(s=><button key={s} onClick={()=>setStF(s)} style={BS(stF===s?(STATUS[s]?.color+"33"||T.border):T.border,stF===s?(STATUS[s]?.color||T.mid):T.mid,{fontSize:10})}>{s==="All"?"All":STATUS[s]?.label}</button>)}</div>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:12}}>
@@ -532,9 +517,9 @@ function Root(){
                 style={{background:T.panel,border:"1px solid "+(s.status==="completed"?T.green+"33":s.status==="in-progress"?T.amber+"33":s.status==="blocked"?T.red+"33":T.border),borderRadius:13,padding:14,cursor:isOffice?"default":"pointer",position:"relative",overflow:"hidden",transition:"all .15s"}}
                 onMouseEnter={e=>{ if(!isOffice){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px #00000055";} }}
                 onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
-                <div style={{position:"absolute",top:0,left:0,width:3,height:"100%",background:PRICOLOR[task.priority],borderRadius:"13px 0 0 13px"}}/>
+                <div style={{position:"absolute",top:0,left:0,width:3,height:"100%",background:PRICLR[task.priority],borderRadius:"13px 0 0 13px"}}/>
                 <div style={{paddingLeft:6}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}><span style={{fontSize:20}}>{task.icon}</span><div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"flex-end"}}><span style={chip(sc.color)}>{sc.label}</span><span style={chip(PRICOLOR[task.priority])}>{task.priority}</span></div></div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}><span style={{fontSize:20}}>{task.icon}</span><div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"flex-end"}}><span style={CH(sc.color)}>{sc.label}</span><span style={CH(PRICLR[task.priority])}>{task.priority}</span></div></div>
                   <NameEdit id={task.id} name={data.names[task.id]} canEdit={canEdit} onSave={saveName}/>
                   <div style={{fontSize:10,color:T.dim,marginBottom:6}}>{task.cat} · {task.ref}</div>
                   <div style={{marginBottom:6}}><div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:T.mid,marginBottom:2}}><span>Work</span><span>{s.progress}%</span></div><div style={{height:3,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:s.progress+"%",background:s.status==="completed"?T.green:s.status==="in-progress"?T.amber:s.status==="blocked"?T.red:T.dim,borderRadius:99}}/></div></div>
@@ -553,15 +538,16 @@ function Root(){
     );
   }
 
+  /* ── PAYMENTS ── */
   function Payments(){
     const fp=payFilt==="All"?allPays:allPays.filter(p=>p.type===payFilt);
-    const fpTotal=fp.reduce((s,p)=>s+p.amount,0);
+    const fpT=fp.reduce((s,p)=>s+p.amount,0);
     return(
       <div style={{maxWidth:1060,margin:"0 auto",padding:16}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:10,marginBottom:16}}>
           {[{l:"Task Budget",v:"PKR "+fmtM(totBudget),c:"#38bdf8"},{l:"Task Paid",v:"PKR "+fmtM(totPaid),c:T.green},{l:"Remaining",v:"PKR "+fmtM(totBudget-totPaid),c:T.amber},{l:"Labour Paid",v:"PKR "+fmtM(totLabour),c:"#fb923c"},{l:"Grand Total",v:"PKR "+fmtM(totPaid+totLabour),c:T.purple}].map(x=>(<div key={x.l} style={{background:T.panel,border:"1px solid "+x.c+"22",borderRadius:12,padding:"12px 14px"}}><div style={{fontSize:9,color:T.dim,letterSpacing:1,textTransform:"uppercase",marginBottom:3}}>{x.l}</div><div style={{fontSize:17,fontWeight:700,color:x.c}}>{x.v}</div></div>))}
         </div>
-        <div style={{display:"flex",gap:6,marginBottom:14}}>{[["task","📋 Task Payments"],["labour","👷 Labour"],["material","📦 Materials"]].map(([t,l])=><button key={t} onClick={()=>setPayTab(t)} style={bStyle(payTab===t?"#1d4ed8":T.border,payTab===t?"#fff":T.mid,{fontSize:12})}>{l}</button>)}</div>
+        <div style={{display:"flex",gap:6,marginBottom:14}}>{[["task","📋 Task Payments"],["labour","👷 Labour"],["material","📦 Materials"]].map(([t,l])=><button key={t} onClick={()=>setPayTab(t)} style={BS(payTab===t?"#1d4ed8":T.border,payTab===t?"#fff":T.mid,{fontSize:12})}>{l}</button>)}</div>
 
         {payTab==="task"&&<>
           <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,overflow:"hidden",marginBottom:14}}>
@@ -569,7 +555,7 @@ function Root(){
             <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 100px 50px",padding:"6px 16px",borderBottom:"1px solid "+T.border,background:T.bg}}>{["Task","Budget","Paid","Remaining","Pay%","Txns"].map(h=><div key={h} style={{fontSize:9,color:T.dim,letterSpacing:1,textTransform:"uppercase"}}>{h}</div>)}</div>
             {TASKS.map((task,i)=>{ const s=data.tasks[task.id],b=s.budget,pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0; return(
               <div key={task.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 100px 50px",padding:"9px 16px",borderBottom:i<TASKS.length-1?"1px solid "+T.bg:"none",background:i%2===0?T.bg:T.panel,alignItems:"center"}}>
-                <div style={{display:"flex",alignItems:"center",gap:7}}><span style={{fontSize:14}}>{task.icon}</span><div><div style={{fontSize:12,color:T.text}}>{data.names[task.id]}</div><span style={chip(STATUS[s.status].color)}>{STATUS[s.status].label}</span></div></div>
+                <div style={{display:"flex",alignItems:"center",gap:7}}><span style={{fontSize:14}}>{task.icon}</span><div><div style={{fontSize:12,color:T.text}}>{data.names[task.id]}</div><span style={CH(STATUS[s.status].color)}>{STATUS[s.status].label}</span></div></div>
                 <div style={{fontSize:12,color:b.total>0?"#38bdf8":T.dim}}>{b.total>0?"PKR "+fmtM(b.total):"—"}</div>
                 <div style={{fontSize:12,color:T.green,fontWeight:600}}>PKR {fmtM(b.paid)}</div>
                 <div style={{fontSize:12,color:b.total>0?T.amber:T.dim}}>{b.total>0?"PKR "+fmtM(b.total-b.paid):"—"}</div>
@@ -581,14 +567,14 @@ function Root(){
           <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,overflow:"hidden"}}>
             <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
               <span style={{fontSize:12,color:T.text,fontWeight:600}}>All Transactions ({fp.length})</span>
-              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{["All","Payment","Advance","Retention","Labour","Material"].map(f=><button key={f} onClick={()=>setPayFilt(f)} style={bStyle(payFilt===f?"#1d4ed8":T.border,payFilt===f?"#fff":T.mid,{fontSize:9,padding:"3px 7px"})}>{f}</button>)}</div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{["All","Payment","Advance","Retention","Labour","Material"].map(f=><button key={f} onClick={()=>setPayFilt(f)} style={BS(payFilt===f?"#1d4ed8":T.border,payFilt===f?"#fff":T.mid,{fontSize:9,padding:"3px 7px"})}>{f}</button>)}</div>
             </div>
             {fp.length===0&&<div style={{padding:"28px",textAlign:"center",color:T.dim,fontSize:12}}>No transactions yet.</div>}
             {fp.map(p=>(<div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 16px",borderBottom:"1px solid "+T.bg,flexWrap:"wrap",gap:6}}>
-              <div style={{display:"flex",alignItems:"center",gap:9}}><span style={{fontSize:15}}>{p.ticon}</span><div><div style={{fontSize:12,color:T.text,fontWeight:500}}>{p.tname}</div><div style={{display:"flex",gap:5,marginTop:2}}><span style={chip("#a78bfa")}>{p.type}</span><span style={chip("#64748b")}>{p.method}</span>{p.note&&<span style={{fontSize:10,color:T.dim}}>· {p.note}</span>}</div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{p.date} · {p.by}</div></div></div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,color:T.green,fontWeight:700}}>{fmt(p.amount)}</span>{canEdit&&<button onClick={()=>delPay(p.tid,p.id)} style={bStyle("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
+              <div style={{display:"flex",alignItems:"center",gap:9}}><span style={{fontSize:15}}>{p.ticon}</span><div><div style={{fontSize:12,color:T.text,fontWeight:500}}>{p.tname}</div><div style={{display:"flex",gap:5,marginTop:2}}><span style={CH("#a78bfa")}>{p.type}</span><span style={CH("#64748b")}>{p.method}</span>{p.note&&<span style={{fontSize:10,color:T.dim}}>· {p.note}</span>}</div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{p.date} · {p.by}</div></div></div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,color:T.green,fontWeight:700}}>{fmt(p.amount)}</span>{canEdit&&<button onClick={()=>delPay(p.tid,p.id)} style={BS("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
             </div>))}
-            {fp.length>0&&<div style={{padding:"9px 16px",background:T.bg,display:"flex",justifyContent:"flex-end"}}><span style={{fontSize:12,color:T.green,fontWeight:700}}>Total: {fmt(fpTotal)}</span></div>}
+            {fp.length>0&&<div style={{padding:"9px 16px",background:T.bg,display:"flex",justifyContent:"flex-end"}}><span style={{fontSize:12,color:T.green,fontWeight:700}}>Total: {fmt(fpT)}</span></div>}
           </div>
         </>}
 
@@ -599,25 +585,25 @@ function Root(){
             <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:T.text,fontWeight:600}}>Labour History ({(data.labour||[]).length})</span><span style={{fontSize:12,color:"#fb923c",fontWeight:600}}>Total: {fmt(totLabour)}</span></div>
             {(data.labour||[]).length===0&&<div style={{padding:"28px",textAlign:"center",color:T.dim,fontSize:12}}>No entries yet.</div>}
             {(data.labour||[]).map((l,i)=>(<div key={l.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:i<(data.labour||[]).length-1?"1px solid "+T.bg:"none",background:i%2===0?T.bg:T.panel,flexWrap:"wrap",gap:6}}>
-              <div><div style={{fontSize:12,color:T.text,fontWeight:500}}>{l.work||"Labour"}</div><div style={{display:"flex",gap:5,marginTop:2,flexWrap:"wrap"}}>{l.worker&&<span style={chip("#fb923c")}>👷 {l.worker}</span>}<span style={chip("#64748b")}>{l.method}</span><span style={{fontSize:10,color:T.dim}}>· {l.by}</span></div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{l.date}</div></div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,color:"#fb923c",fontWeight:700}}>{fmt(l.amount)}</span>{canEdit&&<button onClick={()=>delLabour(l.id)} style={bStyle("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
+              <div><div style={{fontSize:12,color:T.text,fontWeight:500}}>{l.work||"Labour"}</div><div style={{display:"flex",gap:5,marginTop:2,flexWrap:"wrap"}}>{l.worker&&<span style={CH("#fb923c")}>👷 {l.worker}</span>}<span style={CH("#64748b")}>{l.method}</span><span style={{fontSize:10,color:T.dim}}>· {l.by}</span></div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{l.date}</div></div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,color:"#fb923c",fontWeight:700}}>{fmt(l.amount)}</span>{canEdit&&<button onClick={()=>delLabour(l.id)} style={BS("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
             </div>))}
           </div>
         </>}
 
         {payTab==="material"&&<>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:14}}>
-            {matStock.length===0?<div style={{gridColumn:"1/-1",background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:18,textAlign:"center",color:T.dim,fontSize:12}}>No materials yet.</div>:matStock.map(m=>(<div key={m.name} style={{background:T.panel,border:"1px solid "+(m.bal<0?T.red+"44":m.bal===0?"#64748b44":"#0f766e44"),borderRadius:12,padding:"11px 13px"}}><div style={{fontSize:11,color:T.text,fontWeight:600,marginBottom:2}}>{m.name}</div><div style={{fontSize:18,fontWeight:700,color:m.bal<0?T.red:m.bal===0?T.mid:T.green}}>{m.bal}<span style={{fontSize:10,fontWeight:400}}> {m.unit}</span></div><div style={{fontSize:10,color:T.dim}}>In:{m.in} Out:{m.out}</div>{m.val>0&&<div style={{fontSize:10,color:"#38bdf8"}}>PKR {fmtM(m.val)}</div>}</div>))}
+            {matStock.length===0?<div style={{gridColumn:"1/-1",background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:18,textAlign:"center",color:T.dim,fontSize:12}}>No materials yet.</div>:matStock.map(m=>(<div key={m.name} style={{background:T.panel,border:"1px solid "+(m.bal<0?T.red+"44":m.bal===0?"#64748b44":"#0f766e44"),borderRadius:12,padding:"11px 13px"}}><div style={{fontSize:11,color:T.text,fontWeight:600,marginBottom:2}}>{m.name}</div><div style={{fontSize:18,fontWeight:700,color:m.bal<0?T.red:m.bal===0?T.mid:T.green}}>{m.bal}<span style={{fontSize:10,fontWeight:400}}> {m.unit}</span></div><div style={{fontSize:10,color:T.dim}}>In:{m.i} Out:{m.o}</div>{m.v>0&&<div style={{fontSize:10,color:"#38bdf8"}}>PKR {fmtM(m.v)}</div>}</div>))}
           </div>
           {!isOffice&&<MatForm onAdd={addMat}/>}
           <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,overflow:"hidden"}}>
             <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
               <span style={{fontSize:12,color:T.text,fontWeight:600}}>Material Ledger ({(data.mats||[]).length})</span>
-              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{["All","received","issued",...[...new Set((data.mats||[]).map(m=>m.name))]].filter((v,i,a)=>a.indexOf(v)===i).map(f=><button key={f} onClick={()=>setMatFilt(f)} style={bStyle(matFilt===f?"#1d4ed8":T.border,matFilt===f?"#fff":T.mid,{fontSize:9,padding:"3px 7px",textTransform:"capitalize"})}>{f}</button>)}</div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{["All","received","issued",...[...new Set((data.mats||[]).map(m=>m.name))]].filter((v,i,a)=>a.indexOf(v)===i).map(f=><button key={f} onClick={()=>setMatFilt(f)} style={BS(matFilt===f?"#1d4ed8":T.border,matFilt===f?"#fff":T.mid,{fontSize:9,padding:"3px 7px",textTransform:"capitalize"})}>{f}</button>)}</div>
             </div>
             {(data.mats||[]).filter(m=>matFilt==="All"||(m.type===matFilt||m.name===matFilt)).map((m,i,arr)=>(<div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid "+T.bg:"none",background:i%2===0?T.bg:T.panel,flexWrap:"wrap",gap:6}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><span>{m.type==="received"?"📥":"📤"}</span><div><div style={{fontSize:12,color:T.text,fontWeight:600}}>{m.name}</div><div style={{display:"flex",gap:5,marginTop:2,flexWrap:"wrap"}}><span style={chip(m.type==="received"?"#0f766e":"#991b1b")}>{m.type}</span><span style={chip("#64748b")}>{m.unit}</span>{m.supplier&&<span style={{fontSize:10,color:T.dim}}>🏭 {m.supplier}</span>}<span style={{fontSize:10,color:T.dim}}>· {m.by}</span></div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{m.date}{m.rate>0?" · PKR "+fmtM(m.rate)+"/"+m.unit:""}</div></div></div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:15,fontWeight:700,color:m.type==="received"?T.green:T.red}}>{m.type==="received"?"+":"-"}{m.qty} {m.unit}</span>{m.type==="received"&&m.rate>0&&<span style={{fontSize:10,color:"#38bdf8"}}>PKR {fmtM(m.qty*m.rate)}</span>}{canEdit&&<button onClick={()=>delMat(m.id)} style={bStyle("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><span>{m.type==="received"?"📥":"📤"}</span><div><div style={{fontSize:12,color:T.text,fontWeight:600}}>{m.name}</div><div style={{display:"flex",gap:5,marginTop:2,flexWrap:"wrap"}}><span style={CH(m.type==="received"?"#0f766e":"#991b1b")}>{m.type}</span><span style={CH("#64748b")}>{m.unit}</span>{m.supplier&&<span style={{fontSize:10,color:T.dim}}>🏭 {m.supplier}</span>}<span style={{fontSize:10,color:T.dim}}>· {m.by}</span></div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{m.date}{m.rate>0?" · PKR "+fmtM(m.rate)+"/"+m.unit:""}</div></div></div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:15,fontWeight:700,color:m.type==="received"?T.green:T.red}}>{m.type==="received"?"+":"-"}{m.qty} {m.unit}</span>{m.type==="received"&&m.rate>0&&<span style={{fontSize:10,color:"#38bdf8"}}>PKR {fmtM(m.qty*m.rate)}</span>}{canEdit&&<button onClick={()=>delMat(m.id)} style={BS("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
             </div>))}
           </div>
         </>}
@@ -625,20 +611,22 @@ function Root(){
     );
   }
 
+  /* ── ANALYTICS ── */
   function Analytics(){
-    const byStatus=Object.entries(STATUS).map(([k,v])=>({label:v.label,count:TASKS.filter(t=>data.tasks[t.id].status===k).length,color:v.color}));
+    const byS=Object.entries(STATUS).map(([k,v])=>({label:v.label,count:TASKS.filter(t=>data.tasks[t.id].status===k).length,color:v.color}));
     const cols=["#38bdf8","#a78bfa","#22c55e","#f59e0b","#f43f5e"];
-    const byCat=[...new Set(TASKS.map(t=>t.cat))].map((c,i)=>({cat:c,tasks:TASKS.filter(t=>t.cat===c),budget:TASKS.filter(t=>t.cat===c).reduce((s,t)=>s+data.tasks[t.id].budget.total,0),paid:TASKS.filter(t=>t.cat===c).reduce((s,t)=>s+data.tasks[t.id].budget.paid,0),prog:Math.round(TASKS.filter(t=>t.cat===c).reduce((s,t)=>s+data.tasks[t.id].progress,0)/TASKS.filter(t=>t.cat===c).length),color:cols[i%cols.length]}));
+    const byC=[...new Set(TASKS.map(t=>t.cat))].map((c,i)=>({cat:c,tasks:TASKS.filter(t=>t.cat===c),budget:TASKS.filter(t=>t.cat===c).reduce((s,t)=>s+data.tasks[t.id].budget.total,0),paid:TASKS.filter(t=>t.cat===c).reduce((s,t)=>s+data.tasks[t.id].budget.paid,0),prog:Math.round(TASKS.filter(t=>t.cat===c).reduce((s,t)=>s+data.tasks[t.id].progress,0)/TASKS.filter(t=>t.cat===c).length),color:cols[i%cols.length]}));
     return(
       <div style={{maxWidth:1060,margin:"0 auto",padding:16}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
-          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:16}}><div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>Tasks by Status</div>{byStatus.map(s=>(<div key={s.label} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}><span style={{color:s.color}}>{s.label}</span><span style={{color:T.mid}}>{s.count}</span></div><div style={{height:7,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:(s.count/TASKS.length*100)+"%",background:s.color,borderRadius:99}}/></div></div>))}</div>
-          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:16}}><div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>Budget by Category</div>{byCat.map(c=>{ const pct=c.budget>0?Math.round(c.paid/c.budget*100):0; return(<div key={c.cat} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}><span style={{color:c.color}}>{c.cat} ({c.tasks.length})</span><span style={{color:T.mid}}>PKR {fmtM(c.budget)} · {pct}%</span></div><div style={{height:6,background:c.color+"33",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:pct+"%",background:c.color,borderRadius:99}}/></div></div>); })}</div>
+          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:16}}><div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>Tasks by Status</div>{byS.map(s=>(<div key={s.label} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}><span style={{color:s.color}}>{s.label}</span><span style={{color:T.mid}}>{s.count}</span></div><div style={{height:7,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:(s.count/TASKS.length*100)+"%",background:s.color,borderRadius:99}}/></div></div>))}</div>
+          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:16}}><div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>Budget by Category</div>{byC.map(c=>{ const pct=c.budget>0?Math.round(c.paid/c.budget*100):0; return(<div key={c.cat} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}><span style={{color:c.color}}>{c.cat} ({c.tasks.length})</span><span style={{color:T.mid}}>PKR {fmtM(c.budget)} · {pct}%</span></div><div style={{height:6,background:c.color+"33",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:pct+"%",background:c.color,borderRadius:99}}/></div></div>); })}</div>
         </div>
       </div>
     );
   }
 
+  /* ── LOG ── */
   function Log(){
     return(
       <div style={{maxWidth:720,margin:"0 auto",padding:16}}>
@@ -651,6 +639,7 @@ function Root(){
     );
   }
 
+  /* ── BRIEFING ── */
   function Briefing(){
     return(
       <div style={{maxWidth:680,margin:"0 auto",padding:16}}>
@@ -665,11 +654,12 @@ function Root(){
     );
   }
 
+  /* ── RENDER ── */
   return(
     <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Segoe UI',Arial,sans-serif"}}>
       <Nav/>
       {page==="dashboard"&&<Dashboard/>}
-      {page==="task"&&activeTask&&<TaskPage key={tid} task={activeTask} name={data.names[tid]} taskData={data.tasks[tid]} perm={user.perm} canEdit={canEdit} onSave={d=>saveTask(tid,d)} onBack={()=>setPage("dashboard")} onAddPay={p=>addPay(tid,p)} onDelPay={pid=>delPay(tid,pid)} onAddPhoto={p=>addPhoto(tid,p)} onDelPhoto={pid=>delPhoto(tid,pid)}/>}
+      {page==="task"&&activeTask&&<TaskPage key={tid} task={activeTask} name={data.names[tid]} td={data.tasks[tid]} perm={user.perm} canEdit={canEdit} onSave={d=>saveTask(tid,d)} onBack={()=>setPage("dashboard")} onAddPay={p=>addPay(tid,p)} onDelPay={pid=>delPay(tid,pid)} onAddPhoto={p=>addPhoto(tid,p)} onDelPhoto={pid=>delPhoto(tid,pid)}/>}
       {page==="payments"&&<Payments/>}
       {page==="analytics"&&<Analytics/>}
       {page==="log"&&<Log/>}
@@ -678,7 +668,7 @@ function Root(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<Root/>);
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
