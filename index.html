@@ -7,51 +7,13 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<!-- Firebase -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCLX4Qv_p6n1IXomX_pCCmCSld08tmONZI",
-    authDomain: "valencia116d.firebaseapp.com",
-    projectId: "valencia116d",
-    storageBucket: "valencia116d.firebasestorage.app",
-    messagingSenderId: "1006323445862",
-    appId: "1:1006323445862:web:26cc5e4f1a12498241fda7"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
-  const REF = doc(db, "projects", "valencia116d");
-
-  // expose to Babel/React world
-  window._fbReady = false;
-  window._fbData  = null;
-  window._fbSave  = async (data) => {
-    try {
-      await setDoc(REF, { payload: JSON.stringify(data) });
-      return true;
-    } catch(e) { console.error("Save error", e); return false; }
-  };
-  window._fbSubscribe = (cb) => {
-    return onSnapshot(REF, (snap) => {
-      if (snap.exists()) {
-        try { cb(JSON.parse(snap.data().payload)); } catch(e) { cb(null); }
-      } else {
-        cb(null); // first time, no data yet
-      }
-    });
-  };
-  window._fbReady = true;
-  window.dispatchEvent(new Event("fb-ready"));
-</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#07090f;color:#cbd5e1;font-family:'Segoe UI',Arial,sans-serif;}
 ::-webkit-scrollbar{width:5px;} ::-webkit-scrollbar-track{background:#0d1117;} ::-webkit-scrollbar-thumb{background:#1a2030;border-radius:9px;}
 select option{background:#07090f;}
 input[type=range]{width:100%;}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -63,6 +25,46 @@ const useMemo     = React.useMemo;
 const useEffect   = React.useEffect;
 const useCallback = React.useCallback;
 
+// ─── JSONBIN CONFIG ───────────────────────────────────────────────────────────
+const JSONBIN_KEY = "$2a$10$ecFrK4rlHLNxqPQ4EWDiOORHEKfmbia34dQ3kLN7BTUHAcYbq1G5q";
+const JSONBIN_URL = "https://api.jsonbin.io/v3/b";
+let   BIN_ID      = localStorage.getItem("vlc_bin_id") || null;
+
+async function dbLoad(){
+  try {
+    if(!BIN_ID){
+      // create a new bin on first run
+      const r = await fetch(JSONBIN_URL, {
+        method:"POST",
+        headers:{"Content-Type":"application/json","X-Master-Key":JSONBIN_KEY,"X-Bin-Name":"valencia116d"},
+        body: JSON.stringify({init:true})
+      });
+      const d = await r.json();
+      BIN_ID = d.metadata?.id;
+      if(BIN_ID) localStorage.setItem("vlc_bin_id", BIN_ID);
+      return null; // fresh start
+    }
+    const r = await fetch(JSONBIN_URL+"/"+BIN_ID+"/latest", {
+      headers:{"X-Master-Key":JSONBIN_KEY}
+    });
+    const d = await r.json();
+    if(d.record?.init) return null;
+    return d.record || null;
+  } catch(e){ console.error("Load error",e); return null; }
+}
+
+async function dbSave(data){
+  try {
+    if(!BIN_ID) return false;
+    const r = await fetch(JSONBIN_URL+"/"+BIN_ID, {
+      method:"PUT",
+      headers:{"Content-Type":"application/json","X-Master-Key":JSONBIN_KEY},
+      body: JSON.stringify(data)
+    });
+    return r.ok;
+  } catch(e){ console.error("Save error",e); return false; }
+}
+
 // ─── USERS ───────────────────────────────────────────────────────────────────
 const USERS = [
   {id:"omer",   name:"Omer",         role:"Owner",           pin:"2123", color:"#a78bfa", icon:"👑", perm:"all"},
@@ -70,10 +72,8 @@ const USERS = [
   {id:"awais",  name:"Awais (Site)", role:"Site Supervisor", pin:null,   color:"#22c55e", icon:"🦺", perm:"add_only"},
 ];
 
-// ─── PROJECT ──────────────────────────────────────────────────────────────────
 const PROJECT = {name:"Plot 116-D Valencia Town",client:"Mr. Omer",architect:"Ar. Fazeel Amjad",firm:"GharPlans.pk",plotSize:"75′×120′",totalArea:"13,704 sqft"};
 
-// ─── TASKS ───────────────────────────────────────────────────────────────────
 const TASKS = [
   {id:1,  name:"Plumbing",                   icon:"🔧",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"P-02→P-09",details:["Sewerage traps on all floors","Submersible pumps ×2","UGWT + OHWT at Roof","Hot water lines","Pool drain plumbing","Gas pipe","Sunken slabs at wet areas"],scope:"13+ wet areas, pool machine room, 3 kitchens"},
   {id:2,  name:"Electrification",            icon:"⚡",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-01→E-09",details:["DB boards + full wiring","CCTV 8 cameras","Dumb waiter electrical","Double-height lounge wiring","Earthing + surge protection"],scope:"All rooms, lounge, pool, quarters"},
@@ -94,7 +94,6 @@ const TASKS = [
   {id:17, name:"AC Works",                   icon:"❄️",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-01→E-09",details:["Basement 3 cassette units","Ground 4-5 units","First 4 units","Roof/Quarters 1-2 units","Compressor pads","Copper refrigerant lines","Condensate drains","Gas charging + commissioning"],scope:"12-15 AC units across all floors"},
 ];
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const STATUS   = {"not-started":{label:"Not Started",color:"#64748b"},"in-progress":{label:"In Progress",color:"#f59e0b"},"completed":{label:"Completed",color:"#22c55e"},"blocked":{label:"Blocked",color:"#f43f5e"}};
 const PRICOLOR = {critical:"#f43f5e",high:"#fb923c",medium:"#38bdf8"};
 const METHODS  = ["Cash","Bank Transfer","Cheque","Online Transfer","JazzCash","EasyPaisa"];
@@ -107,24 +106,20 @@ const fmtM = n=>n>=1e6?(n/1e6).toFixed(2)+"M":n>=1000?Math.round(n/1000)+"K":Str
 const ts   = ()=>new Date().toLocaleString("en-PK",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
 const tday = ()=>new Date().toISOString().slice(0,10);
 
-// ─── DEFAULT DATA ─────────────────────────────────────────────────────────────
 function mkData(){
   return {
     names:  TASKS.reduce((a,t)=>({...a,[t.id]:t.name}),{}),
     tasks:  TASKS.reduce((a,t)=>({...a,[t.id]:{status:"not-started",progress:0,notes:"",updatedBy:null,updatedAt:null,history:[],budget:{total:0,paid:0,payments:[]},contractor:{name:"",phone:"",co:""},photos:[]}}),{}),
-    labour: [],
-    mats:   [],
-    log:    [],
+    labour: [], mats: [], log: [],
   };
 }
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
 const T={bg:"#07090f",panel:"#0d1117",border:"#1a2030",dim:"#334155",mid:"#475569",text:"#cbd5e1",hi:"#f1f5f9",green:"#22c55e",amber:"#f59e0b",red:"#f43f5e",purple:"#a78bfa"};
 const iStyle=(x={})=>({background:T.bg,border:"1px solid "+T.border,borderRadius:8,padding:"8px 11px",color:T.text,fontSize:13,outline:"none",fontFamily:"inherit",width:"100%",boxSizing:"border-box",...x});
 const bStyle=(bg,fg="#fff",x={})=>({background:bg,color:fg,border:"none",borderRadius:8,padding:"8px 14px",fontSize:12,cursor:"pointer",fontWeight:600,fontFamily:"inherit",...x});
 const chip=(color)=>({display:"inline-block",fontSize:9,fontWeight:700,letterSpacing:1,textTransform:"uppercase",padding:"2px 7px",borderRadius:99,border:"1px solid "+color+"55",background:color+"18",color});
 
-// ─── NAME EDITOR ─────────────────────────────────────────────────────────────
+// ─── SMALL COMPONENTS ─────────────────────────────────────────────────────────
 function NameEdit({id,name,canEdit,onSave}){
   const [editing,setEditing]=useState(false);
   const [val,setVal]=useState(name);
@@ -133,7 +128,6 @@ function NameEdit({id,name,canEdit,onSave}){
   return <input autoFocus value={val} onChange={e=>setVal(e.target.value)} onBlur={commit} onKeyDown={e=>{if(e.key==="Enter")commit();if(e.key==="Escape")setEditing(false);}} onClick={e=>e.stopPropagation()} style={iStyle({fontSize:13,padding:"3px 7px",fontWeight:600,marginBottom:2})}/>;
 }
 
-// ─── LABOUR FORM ─────────────────────────────────────────────────────────────
 function LabourForm({onAdd}){
   const [amt,setAmt]=useState(""); const [date,setDate]=useState(tday()); const [work,setWork]=useState(""); const [worker,setWorker]=useState(""); const [method,setMethod]=useState("Cash"); const [note,setNote]=useState("");
   function go(){ const a=Number(amt); if(!a||a<=0) return; onAdd({amount:a,date,worker,work,method,note}); setAmt(""); setWorker(""); setWork(""); setNote(""); }
@@ -146,16 +140,15 @@ function LabourForm({onAdd}){
         <select              value={method} onChange={e=>setMethod(e.target.value)} style={iStyle()}>{METHODS.map(m=><option key={m}>{m}</option>)}</select>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-        <input value={worker} onChange={e=>setWorker(e.target.value)} placeholder="Worker name"        style={iStyle()}/>
-        <input value={work}   onChange={e=>setWork(e.target.value)}   placeholder="Work description *"  style={iStyle()}/>
-        <input value={note}   onChange={e=>setNote(e.target.value)}   placeholder="Note / reference"    style={iStyle()}/>
+        <input value={worker} onChange={e=>setWorker(e.target.value)} placeholder="Worker name"       style={iStyle()}/>
+        <input value={work}   onChange={e=>setWork(e.target.value)}   placeholder="Work description *" style={iStyle()}/>
+        <input value={note}   onChange={e=>setNote(e.target.value)}   placeholder="Note / reference"   style={iStyle()}/>
       </div>
       <button onClick={go} disabled={!amt||Number(amt)<=0} style={bStyle("#7c2d12","#fed7aa",{width:"100%",padding:"9px",opacity:!amt||Number(amt)<=0?.5:1})}>+ Record Labour Payment</button>
     </div>
   );
 }
 
-// ─── MATERIAL FORM ────────────────────────────────────────────────────────────
 function MatForm({onAdd}){
   const [name,setName]=useState(""); const [unit,setUnit]=useState("bags"); const [qty,setQty]=useState(""); const [date,setDate]=useState(tday()); const [type,setType]=useState("received"); const [rate,setRate]=useState(""); const [supp,setSupp]=useState(""); const [note,setNote]=useState("");
   function go(){ const q=Number(qty); if(!name.trim()||!q||q<=0) return; onAdd({name:name.trim(),unit,qty:q,type,date,rate:Number(rate)||0,supplier:supp,note}); setQty(""); setRate(""); setNote(""); setSupp(""); }
@@ -186,21 +179,13 @@ function MatForm({onAdd}){
 
 // ─── TASK PAGE ────────────────────────────────────────────────────────────────
 function TaskPage({task,name,taskData,perm,canEdit,onSave,onBack,onAddPay,onDelPay,onAddPhoto,onDelPhoto}){
-  const s=taskData, b=s.budget;
-  const canAdd=perm!=="payments_only";
+  const s=taskData,b=s.budget,canAdd=perm!=="payments_only";
   const pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0;
-  const [status,setStatus]=useState(s.status);
-  const [prog,setProg]=useState(s.progress);
-  const [notes,setNotes]=useState(s.notes||"");
-  const [budget,setBudget]=useState(b.total||"");
-  const [cName,setCName]=useState(s.contractor.name||"");
-  const [cPhone,setCPhone]=useState(s.contractor.phone||"");
-  const [cCo,setCCo]=useState(s.contractor.co||"");
+  const [status,setStatus]=useState(s.status); const [prog,setProg]=useState(s.progress); const [notes,setNotes]=useState(s.notes||"");
+  const [budget,setBudget]=useState(b.total||""); const [cName,setCName]=useState(s.contractor.name||""); const [cPhone,setCPhone]=useState(s.contractor.phone||""); const [cCo,setCCo]=useState(s.contractor.co||"");
   const [pAmt,setPAmt]=useState(""); const [pDate,setPDate]=useState(tday()); const [pMeth,setPMeth]=useState("Cash"); const [pNote,setPNote]=useState(""); const [pType,setPType]=useState("Payment");
-  const [cap,setCap]=useState(""); const [lb,setLb]=useState(null);
-  const [aiTxt,setAiTxt]=useState(""); const [aiLd,setAiLd]=useState(false);
+  const [cap,setCap]=useState(""); const [lb,setLb]=useState(null); const [aiTxt,setAiTxt]=useState(""); const [aiLd,setAiLd]=useState(false);
   const fRef=useRef();
-
   function doSave(){ onSave({status,prog,notes,budget:Number(budget)||0,contractor:{name:cName,phone:cPhone,co:cCo}}); }
   function doPay(){ const a=Number(pAmt); if(!a||a<=0) return; onAddPay({amount:a,date:pDate,method:pMeth,note:pNote,type:pType}); setPAmt(""); setPNote(""); }
   function doPhoto(e){ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ onAddPhoto({data:ev.target.result,caption:cap||f.name,size:Math.round(f.size/1024)+"KB"}); setCap(""); e.target.value=""; }; r.readAsDataURL(f); }
@@ -212,7 +197,6 @@ function TaskPage({task,name,taskData,perm,canEdit,onSave,onBack,onAddPay,onDelP
     }catch(e){ setAiTxt("⚠️ "+e.message); }
     setAiLd(false);
   }
-
   return(
     <div style={{maxWidth:720,margin:"0 auto",padding:16}}>
       {lb&&<div onClick={()=>setLb(null)} style={{position:"fixed",inset:0,background:"#000c",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
@@ -230,11 +214,7 @@ function TaskPage({task,name,taskData,perm,canEdit,onSave,onBack,onAddPay,onDelP
           <div style={{flex:1}}>
             <div style={{fontSize:17,color:T.hi,fontWeight:700,marginBottom:2}}>{name}</div>
             <div style={{fontSize:11,color:T.dim,marginBottom:5}}>{task.cat} · {task.ref}</div>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-              {task.floors.map(f=><span key={f} style={chip("#38bdf8")}>{f}</span>)}
-              <span style={chip(PRICOLOR[task.priority])}>{task.priority}</span>
-              {s.updatedBy&&<span style={{fontSize:10,color:T.dim}}>· {s.updatedBy}</span>}
-            </div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{task.floors.map(f=><span key={f} style={chip("#38bdf8")}>{f}</span>)}<span style={chip(PRICOLOR[task.priority])}>{task.priority}</span>{s.updatedBy&&<span style={{fontSize:10,color:T.dim}}>· {s.updatedBy}</span>}</div>
           </div>
         </div>
         <div style={{background:T.bg,border:"1px solid "+T.border,borderRadius:10,padding:"10px 14px",marginBottom:14}}>
@@ -266,17 +246,9 @@ function TaskPage({task,name,taskData,perm,canEdit,onSave,onBack,onAddPay,onDelP
           </div>
         </div>
         <div style={{background:T.bg,border:"1px solid #14532d66",borderRadius:12,padding:16,marginBottom:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
-            <div style={{fontSize:13,color:"#86efac",fontWeight:700}}>💳 PAYMENTS</div>
-            <div style={{fontSize:11,color:T.mid}}>{(b.payments||[]).length} txns</div>
-          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{fontSize:13,color:"#86efac",fontWeight:700}}>💳 PAYMENTS</div><div style={{fontSize:11,color:T.mid}}>{(b.payments||[]).length} txns</div></div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:b.total>0?10:14}}>
-            {[{l:"Budget",v:b.total>0?fmt(b.total):"Not set",c:"#38bdf8"},{l:"Paid",v:fmt(b.paid),c:T.green},{l:"Remaining",v:b.total>0?fmt(b.total-b.paid):"—",c:T.amber},{l:"% Paid",v:b.total>0?pp+"%":"—",c:pp>=100?T.red:T.green}].map(x=>(
-              <div key={x.l} style={{background:T.panel,borderRadius:8,padding:"8px 10px",textAlign:"center",border:"1px solid "+T.border}}>
-                <div style={{fontSize:9,color:T.dim,textTransform:"uppercase",marginBottom:2}}>{x.l}</div>
-                <div style={{fontSize:12,fontWeight:700,color:x.c}}>{x.v}</div>
-              </div>
-            ))}
+            {[{l:"Budget",v:b.total>0?fmt(b.total):"Not set",c:"#38bdf8"},{l:"Paid",v:fmt(b.paid),c:T.green},{l:"Remaining",v:b.total>0?fmt(b.total-b.paid):"—",c:T.amber},{l:"% Paid",v:b.total>0?pp+"%":"—",c:pp>=100?T.red:T.green}].map(x=>(<div key={x.l} style={{background:T.panel,borderRadius:8,padding:"8px 10px",textAlign:"center",border:"1px solid "+T.border}}><div style={{fontSize:9,color:T.dim,textTransform:"uppercase",marginBottom:2}}>{x.l}</div><div style={{fontSize:12,fontWeight:700,color:x.c}}>{x.v}</div></div>))}
           </div>
           {b.total>0&&<div style={{height:7,background:T.border,borderRadius:99,overflow:"hidden",marginBottom:14}}><div style={{height:"100%",width:pp+"%",background:pp>=100?"#ef4444":"#22c55e",borderRadius:99}}/></div>}
           {canEdit&&<><div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>Budget Estimate (PKR)</div><input type="number" value={budget} onChange={e=>setBudget(e.target.value)} placeholder="Enter total budget…" style={iStyle({marginBottom:12})}/></>}
@@ -293,52 +265,24 @@ function TaskPage({task,name,taskData,perm,canEdit,onSave,onBack,onAddPay,onDelP
             </div>
             <button onClick={doPay} disabled={!pAmt||Number(pAmt)<=0} style={bStyle("#14532d","#86efac",{width:"100%",padding:"9px",opacity:!pAmt||Number(pAmt)<=0?.5:1})}>+ Record Payment</button>
           </div>}
-          {(b.payments||[]).length>0&&<div style={{maxHeight:180,overflowY:"auto"}}>{(b.payments||[]).map(p=>(
-            <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:T.panel,borderRadius:8,marginBottom:4,border:"1px solid "+T.border}}>
-              <div><div style={{display:"flex",gap:5}}><span style={chip("#a78bfa")}>{p.type}</span><span style={chip("#64748b")}>{p.method}</span></div><div style={{fontSize:10,color:T.dim,marginTop:2}}>{p.date} · {p.by}{p.note?" · "+p.note:""}</div></div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:13,color:T.green,fontWeight:700}}>{fmt(p.amount)}</span>{canEdit&&<button onClick={()=>onDelPay(p.id)} style={bStyle("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
-            </div>
-          ))}</div>}
+          {(b.payments||[]).length>0&&<div style={{maxHeight:180,overflowY:"auto"}}>{(b.payments||[]).map(p=>(<div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:T.panel,borderRadius:8,marginBottom:4,border:"1px solid "+T.border}}>
+            <div><div style={{display:"flex",gap:5}}><span style={chip("#a78bfa")}>{p.type}</span><span style={chip("#64748b")}>{p.method}</span></div><div style={{fontSize:10,color:T.dim,marginTop:2}}>{p.date} · {p.by}{p.note?" · "+p.note:""}</div></div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:13,color:T.green,fontWeight:700}}>{fmt(p.amount)}</span>{canEdit&&<button onClick={()=>onDelPay(p.id)} style={bStyle("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
+          </div>))}</div>}
         </div>
         <div style={{background:T.bg,border:"1px solid #1e3a5f",borderRadius:12,padding:16,marginBottom:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <div style={{fontSize:13,color:"#93c5fd",fontWeight:700}}>📷 SITE PHOTOS</div>
-            <span style={{fontSize:11,color:T.mid}}>{(s.photos||[]).length} photos</span>
-          </div>
-          {canAdd&&<div style={{display:"flex",gap:8,marginBottom:12}}>
-            <input value={cap} onChange={e=>setCap(e.target.value)} placeholder="Caption…" style={iStyle({flex:1})}/>
-            <button onClick={()=>fRef.current?.click()} style={bStyle("#1e3a8a","#93c5fd",{whiteSpace:"nowrap"})}>📁 Upload</button>
-            <input ref={fRef} type="file" accept="image/*" style={{display:"none"}} onChange={doPhoto}/>
-          </div>}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><div style={{fontSize:13,color:"#93c5fd",fontWeight:700}}>📷 SITE PHOTOS</div><span style={{fontSize:11,color:T.mid}}>{(s.photos||[]).length} photos</span></div>
+          {canAdd&&<div style={{display:"flex",gap:8,marginBottom:12}}><input value={cap} onChange={e=>setCap(e.target.value)} placeholder="Caption…" style={iStyle({flex:1})}/><button onClick={()=>fRef.current?.click()} style={bStyle("#1e3a8a","#93c5fd",{whiteSpace:"nowrap"})}>📁 Upload</button><input ref={fRef} type="file" accept="image/*" style={{display:"none"}} onChange={doPhoto}/></div>}
           {(s.photos||[]).length===0?<div style={{textAlign:"center",padding:"14px 0",color:T.dim,fontSize:12}}>No photos yet.</div>
-            :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8}}>
-              {(s.photos||[]).map(p=>(
-                <div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer"}} onClick={()=>setLb(p)}>
-                  <img src={p.data} alt={p.caption} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/>
-                  <div style={{padding:"5px 7px",background:T.panel}}><div style={{fontSize:9,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.caption}</div><div style={{fontSize:8,color:T.dim}}>{p.by} · {p.size}</div></div>
-                  {canEdit&&<button onClick={e=>{e.stopPropagation();onDelPhoto(p.id);}} style={{position:"absolute",top:4,right:4,background:"#000b",border:"none",borderRadius:99,width:20,height:20,color:"#fff",fontSize:10,cursor:"pointer"}}>✕</button>}
-                </div>
-              ))}
-            </div>}
+            :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8}}>{(s.photos||[]).map(p=>(<div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer"}} onClick={()=>setLb(p)}><img src={p.data} alt={p.caption} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/><div style={{padding:"5px 7px",background:T.panel}}><div style={{fontSize:9,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.caption}</div><div style={{fontSize:8,color:T.dim}}>{p.by} · {p.size}</div></div>{canEdit&&<button onClick={e=>{e.stopPropagation();onDelPhoto(p.id);}} style={{position:"absolute",top:4,right:4,background:"#000b",border:"none",borderRadius:99,width:20,height:20,color:"#fff",fontSize:10,cursor:"pointer"}}>✕</button>}</div>))}</div>}
         </div>
         <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
           {canEdit?<button onClick={doSave} style={bStyle("#1d4ed8")}>💾 Save Changes</button>:<div style={{fontSize:12,color:T.dim,padding:"8px 12px",background:T.bg,borderRadius:8,border:"1px solid "+T.border}}>🔒 View only — Omer can edit</div>}
           <button onClick={doAI} disabled={aiLd} style={bStyle("#7c1d1d","#fca5a5",{opacity:aiLd?.7:1})}>{aiLd?"Analyzing…":"🤖 AI Advisor"}</button>
           <button onClick={onBack} style={bStyle(T.border,T.mid)}>← Back</button>
         </div>
-        {(aiLd||aiTxt)&&<div style={{background:"#0a0d14",border:"1px solid #7c1d1d44",borderRadius:10,padding:14,marginBottom:14}}>
-          <div style={{fontSize:10,color:"#fb923c",letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>🤖 AI Advisor</div>
-          {aiLd?<div style={{color:T.dim,fontSize:12}}>Analyzing…</div>:<div style={{fontSize:13,color:T.text,lineHeight:1.85,whiteSpace:"pre-wrap"}}>{aiTxt}</div>}
-        </div>}
-        {(s.history||[]).length>0&&<div>
-          <div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>Update History</div>
-          <div style={{maxHeight:160,overflowY:"auto"}}>{(s.history||[]).map((h,i)=>(
-            <div key={i} style={{borderLeft:"2px solid "+T.border,paddingLeft:10,marginBottom:7}}>
-              <div style={{fontSize:10,color:T.dim}}>{h.time} · <span style={{color:USERS.find(u=>u.name===h.who)?.color||T.mid}}>{h.who}</span> · <span style={{color:STATUS[h.status]?.color}}>{STATUS[h.status]?.label}</span> · {h.prog}%</div>
-              {h.note&&<div style={{fontSize:11,color:"#1e3a5f",marginTop:1}}>{h.note}</div>}
-            </div>
-          ))}</div>
-        </div>}
+        {(aiLd||aiTxt)&&<div style={{background:"#0a0d14",border:"1px solid #7c1d1d44",borderRadius:10,padding:14,marginBottom:14}}><div style={{fontSize:10,color:"#fb923c",letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>🤖 AI Advisor</div>{aiLd?<div style={{color:T.dim,fontSize:12}}>Analyzing…</div>:<div style={{fontSize:13,color:T.text,lineHeight:1.85,whiteSpace:"pre-wrap"}}>{aiTxt}</div>}</div>}
+        {(s.history||[]).length>0&&<div><div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>Update History</div><div style={{maxHeight:160,overflowY:"auto"}}>{(s.history||[]).map((h,i)=>(<div key={i} style={{borderLeft:"2px solid "+T.border,paddingLeft:10,marginBottom:7}}><div style={{fontSize:10,color:T.dim}}>{h.time} · <span style={{color:USERS.find(u=>u.name===h.who)?.color||T.mid}}>{h.who}</span> · <span style={{color:STATUS[h.status]?.color}}>{STATUS[h.status]?.label}</span> · {h.prog}%</div>{h.note&&<div style={{fontSize:11,color:"#1e3a5f",marginTop:1}}>{h.note}</div>}</div>))}</div></div>}
       </div>
     </div>
   );
@@ -348,20 +292,15 @@ function TaskPage({task,name,taskData,perm,canEdit,onSave,onBack,onAddPay,onDelP
 // ROOT
 // ════════════════════════════════════════════════════════════════════════════
 function Root(){
-  // ── firebase state ────────────────────────────────────────────────────────
-  const [fbReady, setFbReady] = useState(false);
-  const [syncing, setSyncing] = useState(true); // loading from firebase
-
-  // ── auth ──────────────────────────────────────────────────────────────────
+  const [loading, setLoading] = useState(true);
+  const [loadMsg, setLoadMsg] = useState("Connecting to database…");
   const [user,    setUser]    = useState(null);
   const [pinSel,  setPinSel]  = useState(null);
   const [pinVal,  setPinVal]  = useState("");
   const [pinErr,  setPinErr]  = useState("");
-
-  // ── app data ──────────────────────────────────────────────────────────────
-  const [data, setData] = useState(mkData);
-
-  // ── ui ────────────────────────────────────────────────────────────────────
+  const [data,    setData]    = useState(mkData);
+  const [saveMsg, setSaveMsg] = useState("");
+  const [saving,  setSaving]  = useState(false);
   const [page,    setPage]    = useState("dashboard");
   const [tid,     setTid]     = useState(null);
   const [payTab,  setPayTab]  = useState("task");
@@ -371,96 +310,90 @@ function Root(){
   const [cat,     setCat]     = useState("All");
   const [stFilt,  setStFilt]  = useState("All");
   const [srch,    setSrch]    = useState("");
-  const [saveMsg, setSaveMsg] = useState("");
   const [brief,   setBrief]   = useState("");
   const [briefLd, setBriefLd] = useState(false);
 
-  // ── wait for firebase then subscribe ──────────────────────────────────────
+  // load on mount
   useEffect(()=>{
-    function init(){
-      setFbReady(true);
-      // subscribe to real-time updates
-      const unsub = window._fbSubscribe(incoming=>{
-        if(incoming){
-          // merge incoming with default to handle new tasks added in future updates
-          setData(prev=>{
-            const merged = {...mkData(),...incoming};
-            // make sure all tasks exist
-            TASKS.forEach(t=>{ if(!merged.tasks[t.id]) merged.tasks[t.id]=mkData().tasks[t.id]; if(!merged.names[t.id]) merged.names[t.id]=t.name; });
-            return merged;
-          });
-        }
-        setSyncing(false);
-      });
-      return unsub;
-    }
-    if(window._fbReady){
-      const unsub=init(); return ()=>unsub&&unsub();
-    } else {
-      window.addEventListener("fb-ready",()=>{ init(); },{once:true});
-    }
+    (async()=>{
+      setLoadMsg("Loading project data…");
+      const saved = await dbLoad();
+      if(saved){
+        // merge with default to handle any new tasks
+        const merged = {...mkData(),...saved};
+        TASKS.forEach(t=>{ if(!merged.tasks[t.id]) merged.tasks[t.id]=mkData().tasks[t.id]; if(!merged.names[t.id]) merged.names[t.id]=t.name; });
+        setData(merged);
+      }
+      setLoading(false);
+    })();
   },[]);
 
-  // ── save to firebase ──────────────────────────────────────────────────────
-  const fbSave = useCallback(async(newData)=>{
-    const ok = await window._fbSave(newData);
-    setSaveMsg(ok?"✓ Saved to cloud":"⚠ Save failed");
-    setTimeout(()=>setSaveMsg(""),2500);
+  // save helper
+  const save = useCallback(async(newData)=>{
+    setSaving(true);
+    const ok = await dbSave(newData);
+    setSaveMsg(ok?"✓ Saved":"⚠ Save failed — check internet");
+    setTimeout(()=>setSaveMsg(""),3000);
+    setSaving(false);
   },[]);
 
-  // ── mutate + save ─────────────────────────────────────────────────────────
+  // mutate + save
   const mut = useCallback(fn=>{
     setData(prev=>{
       const next=fn(prev);
-      fbSave(next);
+      save(next);
       return next;
     });
-  },[fbSave]);
+  },[save]);
 
-  // ── log (takes user obj directly) ─────────────────────────────────────────
   function addLog(u,action,detail){
     const entry={id:Date.now(),time:ts(),who:u.name,wid:u.id,action,detail:detail||""};
     mut(prev=>({...prev,log:[entry,...(prev.log||[]).slice(0,199)]}));
   }
 
-  // ── login ─────────────────────────────────────────────────────────────────
+  // login
   function selectUser(u){
     if(u.pin===null){
-      setUser(u);
-      setPage("dashboard");
-      // log directly without state dependency
+      setUser(u); setPage("dashboard");
       const entry={id:Date.now(),time:ts(),who:u.name,wid:u.id,action:"Login",detail:u.name+" in"};
       mut(prev=>({...prev,log:[entry,...(prev.log||[]).slice(0,199)]}));
-    } else {
-      setPinSel(u); setPinVal(""); setPinErr("");
-    }
+    } else { setPinSel(u); setPinVal(""); setPinErr(""); }
   }
 
   function tryPin(){
     if(!pinSel) return;
     if(pinVal===pinSel.pin){
       const u=pinSel;
-      setUser(u);
-      setPage(u.perm==="payments_only"?"payments":"dashboard");
+      setUser(u); setPage(u.perm==="payments_only"?"payments":"dashboard");
       setPinSel(null); setPinVal("");
       const entry={id:Date.now(),time:ts(),who:u.name,wid:u.id,action:"Login",detail:u.name+" in"};
       mut(prev=>({...prev,log:[entry,...(prev.log||[]).slice(0,199)]}));
-    } else {
-      setPinErr("Incorrect PIN"); setPinVal("");
-    }
+    } else { setPinErr("Incorrect PIN"); setPinVal(""); }
   }
 
   function logout(){ setUser(null); setPinSel(null); setPinVal(""); setPinErr(""); setPage("dashboard"); }
 
-  // ── loading / syncing screen ──────────────────────────────────────────────
-  if(syncing){
+  // refresh data from server
+  async function refresh(){
+    setSaveMsg("🔄 Refreshing…");
+    const saved=await dbLoad();
+    if(saved){
+      const merged={...mkData(),...saved};
+      TASKS.forEach(t=>{ if(!merged.tasks[t.id]) merged.tasks[t.id]=mkData().tasks[t.id]; if(!merged.names[t.id]) merged.names[t.id]=t.name; });
+      setData(merged);
+    }
+    setSaveMsg("✓ Refreshed");
+    setTimeout(()=>setSaveMsg(""),2000);
+  }
+
+  // ── loading screen ────────────────────────────────────────────────────────
+  if(loading){
     return(
       <div style={{minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
         <div style={{fontSize:48}}>🏡</div>
         <div style={{fontSize:18,color:T.hi,fontWeight:700}}>Valencia 116-D</div>
-        <div style={{fontSize:13,color:T.mid}}>Connecting to database…</div>
+        <div style={{fontSize:13,color:T.mid}}>{loadMsg}</div>
         <div style={{width:48,height:48,border:"4px solid "+T.border,borderTopColor:"#a78bfa",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
@@ -521,7 +454,7 @@ function Root(){
   const visTasks=TASKS.filter(t=>{ if(fl!=="All"&&!t.floors.includes(fl)) return false; if(cat!=="All"&&t.cat!==cat) return false; if(stFilt!=="All"&&data.tasks[t.id].status!==stFilt) return false; if(srch&&!(data.names[t.id]||"").toLowerCase().includes(srch.toLowerCase())) return false; return true; });
   const activeTask=tid?TASKS.find(t=>t.id===tid):null;
 
-  // ── mutations ─────────────────────────────────────────────────────────────
+  // mutations
   function saveTask(id,d){
     const now=ts();
     mut(prev=>({...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],status:d.status,progress:d.prog,notes:d.notes,updatedBy:user.name,updatedAt:now,budget:{...prev.tasks[id].budget,total:d.budget},contractor:d.contractor,history:[{time:now,who:user.name,status:d.status,prog:d.prog,note:d.notes},...(prev.tasks[id].history||[]).slice(0,19)]}}}));
@@ -550,7 +483,6 @@ function Root(){
 
   const navPages=[["dashboard","📋 Tasks"],["payments","💳 Payments"],["analytics","📈 Analytics"],["log","📜 Activity"],["briefing","🤖 AI"]].filter(([p])=>isOffice?p==="payments":true);
 
-  // ─── NAV ──────────────────────────────────────────────────────────────────
   function Nav(){
     return(
       <div style={{background:T.panel,borderBottom:"1px solid "+T.border,padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
@@ -562,21 +494,18 @@ function Root(){
               <div style={{fontSize:11,color:T.dim}}>{PROJECT.client} · {PROJECT.plotSize} · {PROJECT.totalArea}</div>
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-              {navPages.map(([p,l])=>(
-                <button key={p} onClick={p==="briefing"?getBrief:()=>setPage(p)} style={bStyle(page===p?"#1d4ed8":T.border,page===p?"#fff":T.mid,{fontSize:11})}>{l}</button>
-              ))}
+              {navPages.map(([p,l])=>(<button key={p} onClick={p==="briefing"?getBrief:()=>setPage(p)} style={bStyle(page===p?"#1d4ed8":T.border,page===p?"#fff":T.mid,{fontSize:11})}>{l}</button>))}
+              <button onClick={refresh} title="Refresh data from server" style={bStyle(T.border,T.mid,{fontSize:11,padding:"8px 10px"})}>🔄</button>
               <div style={{display:"flex",alignItems:"center",gap:6,background:T.bg,border:"1px solid "+user.color+"44",borderRadius:8,padding:"5px 10px"}}>
                 <span style={{fontSize:14}}>{user.icon}</span>
                 <div><div style={{fontSize:12,color:user.color,fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:T.dim}}>{user.role}</div></div>
                 <button onClick={logout} style={bStyle("transparent",T.dim,{fontSize:10,padding:"2px 6px"})}>⏏</button>
               </div>
-              {saveMsg&&<span style={{fontSize:10,color:saveMsg.startsWith("✓")?T.green:T.amber,fontWeight:600}}>{saveMsg}</span>}
+              {(saveMsg||saving)&&<span style={{fontSize:10,color:saving?T.amber:saveMsg.startsWith("✓")?T.green:T.red,fontWeight:600}}>{saving?"Saving…":saveMsg}</span>}
             </div>
           </div>
           <div style={{marginTop:10,display:"flex",gap:16,flexWrap:"wrap",alignItems:"center"}}>
-            {[{v:totProg+"%",l:"Progress",c:"#7c3aed"},{v:cnts.active,l:"Active",c:T.amber},{v:cnts.done+"/"+TASKS.length,l:"Done",c:T.green},{v:cnts.blocked,l:"Blocked",c:T.red},{v:"PKR "+fmtM(totPaid),l:"Task Paid",c:T.green},{v:"PKR "+fmtM(totLabour),l:"Labour",c:"#fb923c"},{v:"PKR "+fmtM(totBudget-totPaid),l:"Remaining",c:T.amber}].map(s=>(
-              <div key={s.l} style={{textAlign:"center"}}><div style={{fontSize:14,fontWeight:700,color:s.c,lineHeight:1}}>{s.v}</div><div style={{fontSize:9,color:T.dim,letterSpacing:1,textTransform:"uppercase"}}>{s.l}</div></div>
-            ))}
+            {[{v:totProg+"%",l:"Progress",c:"#7c3aed"},{v:cnts.active,l:"Active",c:T.amber},{v:cnts.done+"/"+TASKS.length,l:"Done",c:T.green},{v:cnts.blocked,l:"Blocked",c:T.red},{v:"PKR "+fmtM(totPaid),l:"Task Paid",c:T.green},{v:"PKR "+fmtM(totLabour),l:"Labour",c:"#fb923c"},{v:"PKR "+fmtM(totBudget-totPaid),l:"Remaining",c:T.amber}].map(s=>(<div key={s.l} style={{textAlign:"center"}}><div style={{fontSize:14,fontWeight:700,color:s.c,lineHeight:1}}>{s.v}</div><div style={{fontSize:9,color:T.dim,letterSpacing:1,textTransform:"uppercase"}}>{s.l}</div></div>))}
             <div style={{flex:1,minWidth:80}}><div style={{height:4,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:totProg+"%",background:"linear-gradient(90deg,#7c3aed,#22c55e)",borderRadius:99}}/></div></div>
           </div>
         </div>
@@ -584,7 +513,6 @@ function Root(){
     );
   }
 
-  // ─── DASHBOARD ────────────────────────────────────────────────────────────
   function Dashboard(){
     return(
       <div style={{maxWidth:1060,margin:"0 auto",padding:16}}>
@@ -598,8 +526,7 @@ function Root(){
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:12}}>
           {visTasks.map(task=>{
-            const s=data.tasks[task.id],sc=STATUS[s.status],b=s.budget;
-            const pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0;
+            const s=data.tasks[task.id],sc=STATUS[s.status],b=s.budget,pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0;
             return(
               <div key={task.id} onClick={()=>{ if(!isOffice){setTid(task.id);setPage("task");} }}
                 style={{background:T.panel,border:"1px solid "+(s.status==="completed"?T.green+"33":s.status==="in-progress"?T.amber+"33":s.status==="blocked"?T.red+"33":T.border),borderRadius:13,padding:14,cursor:isOffice?"default":"pointer",position:"relative",overflow:"hidden",transition:"all .15s"}}
@@ -626,16 +553,13 @@ function Root(){
     );
   }
 
-  // ─── PAYMENTS ─────────────────────────────────────────────────────────────
   function Payments(){
     const fp=payFilt==="All"?allPays:allPays.filter(p=>p.type===payFilt);
     const fpTotal=fp.reduce((s,p)=>s+p.amount,0);
     return(
       <div style={{maxWidth:1060,margin:"0 auto",padding:16}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:10,marginBottom:16}}>
-          {[{l:"Task Budget",v:"PKR "+fmtM(totBudget),c:"#38bdf8"},{l:"Task Paid",v:"PKR "+fmtM(totPaid),c:T.green},{l:"Remaining",v:"PKR "+fmtM(totBudget-totPaid),c:T.amber},{l:"Labour Paid",v:"PKR "+fmtM(totLabour),c:"#fb923c"},{l:"Grand Total",v:"PKR "+fmtM(totPaid+totLabour),c:T.purple}].map(x=>(
-            <div key={x.l} style={{background:T.panel,border:"1px solid "+x.c+"22",borderRadius:12,padding:"12px 14px"}}><div style={{fontSize:9,color:T.dim,letterSpacing:1,textTransform:"uppercase",marginBottom:3}}>{x.l}</div><div style={{fontSize:17,fontWeight:700,color:x.c}}>{x.v}</div></div>
-          ))}
+          {[{l:"Task Budget",v:"PKR "+fmtM(totBudget),c:"#38bdf8"},{l:"Task Paid",v:"PKR "+fmtM(totPaid),c:T.green},{l:"Remaining",v:"PKR "+fmtM(totBudget-totPaid),c:T.amber},{l:"Labour Paid",v:"PKR "+fmtM(totLabour),c:"#fb923c"},{l:"Grand Total",v:"PKR "+fmtM(totPaid+totLabour),c:T.purple}].map(x=>(<div key={x.l} style={{background:T.panel,border:"1px solid "+x.c+"22",borderRadius:12,padding:"12px 14px"}}><div style={{fontSize:9,color:T.dim,letterSpacing:1,textTransform:"uppercase",marginBottom:3}}>{x.l}</div><div style={{fontSize:17,fontWeight:700,color:x.c}}>{x.v}</div></div>))}
         </div>
         <div style={{display:"flex",gap:6,marginBottom:14}}>{[["task","📋 Task Payments"],["labour","👷 Labour"],["material","📦 Materials"]].map(([t,l])=><button key={t} onClick={()=>setPayTab(t)} style={bStyle(payTab===t?"#1d4ed8":T.border,payTab===t?"#fff":T.mid,{fontSize:12})}>{l}</button>)}</div>
 
@@ -660,12 +584,10 @@ function Root(){
               <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{["All","Payment","Advance","Retention","Labour","Material"].map(f=><button key={f} onClick={()=>setPayFilt(f)} style={bStyle(payFilt===f?"#1d4ed8":T.border,payFilt===f?"#fff":T.mid,{fontSize:9,padding:"3px 7px"})}>{f}</button>)}</div>
             </div>
             {fp.length===0&&<div style={{padding:"28px",textAlign:"center",color:T.dim,fontSize:12}}>No transactions yet.</div>}
-            {fp.map(p=>(
-              <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 16px",borderBottom:"1px solid "+T.bg,flexWrap:"wrap",gap:6}}>
-                <div style={{display:"flex",alignItems:"center",gap:9}}><span style={{fontSize:15}}>{p.ticon}</span><div><div style={{fontSize:12,color:T.text,fontWeight:500}}>{p.tname}</div><div style={{display:"flex",gap:5,marginTop:2}}><span style={chip("#a78bfa")}>{p.type}</span><span style={chip("#64748b")}>{p.method}</span>{p.note&&<span style={{fontSize:10,color:T.dim}}>· {p.note}</span>}</div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{p.date} · {p.by}</div></div></div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,color:T.green,fontWeight:700}}>{fmt(p.amount)}</span>{canEdit&&<button onClick={()=>delPay(p.tid,p.id)} style={bStyle("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
-              </div>
-            ))}
+            {fp.map(p=>(<div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 16px",borderBottom:"1px solid "+T.bg,flexWrap:"wrap",gap:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:9}}><span style={{fontSize:15}}>{p.ticon}</span><div><div style={{fontSize:12,color:T.text,fontWeight:500}}>{p.tname}</div><div style={{display:"flex",gap:5,marginTop:2}}><span style={chip("#a78bfa")}>{p.type}</span><span style={chip("#64748b")}>{p.method}</span>{p.note&&<span style={{fontSize:10,color:T.dim}}>· {p.note}</span>}</div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{p.date} · {p.by}</div></div></div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,color:T.green,fontWeight:700}}>{fmt(p.amount)}</span>{canEdit&&<button onClick={()=>delPay(p.tid,p.id)} style={bStyle("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
+            </div>))}
             {fp.length>0&&<div style={{padding:"9px 16px",background:T.bg,display:"flex",justifyContent:"flex-end"}}><span style={{fontSize:12,color:T.green,fontWeight:700}}>Total: {fmt(fpTotal)}</span></div>}
           </div>
         </>}
@@ -703,7 +625,6 @@ function Root(){
     );
   }
 
-  // ─── ANALYTICS ────────────────────────────────────────────────────────────
   function Analytics(){
     const byStatus=Object.entries(STATUS).map(([k,v])=>({label:v.label,count:TASKS.filter(t=>data.tasks[t.id].status===k).length,color:v.color}));
     const cols=["#38bdf8","#a78bfa","#22c55e","#f59e0b","#f43f5e"];
@@ -711,25 +632,13 @@ function Root(){
     return(
       <div style={{maxWidth:1060,margin:"0 auto",padding:16}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
-          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:16}}>
-            <div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>Tasks by Status</div>
-            {byStatus.map(s=>(<div key={s.label} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}><span style={{color:s.color}}>{s.label}</span><span style={{color:T.mid}}>{s.count}</span></div><div style={{height:7,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:(s.count/TASKS.length*100)+"%",background:s.color,borderRadius:99}}/></div></div>))}
-          </div>
-          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:16}}>
-            <div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>Budget by Category</div>
-            {byCat.map(c=>{ const pct=c.budget>0?Math.round(c.paid/c.budget*100):0; return(<div key={c.cat} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}><span style={{color:c.color}}>{c.cat} ({c.tasks.length})</span><span style={{color:T.mid}}>PKR {fmtM(c.budget)} · {pct}%</span></div><div style={{height:6,background:c.color+"33",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:pct+"%",background:c.color,borderRadius:99}}/></div></div>); })}
-          </div>
-        </div>
-        <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,overflow:"hidden"}}>
-          <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border}}><span style={{fontSize:12,color:T.text,fontWeight:600}}>Category Progress Matrix</span></div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 55px 80px 110px 110px 110px",padding:"6px 16px",borderBottom:"1px solid "+T.border,background:T.bg}}>{["Category","Tasks","Work%","Budget","Paid","Remaining"].map(h=><div key={h} style={{fontSize:9,color:T.dim,textTransform:"uppercase",letterSpacing:1}}>{h}</div>)}</div>
-          {byCat.map((c,i)=>(<div key={c.cat} style={{display:"grid",gridTemplateColumns:"1fr 55px 80px 110px 110px 110px",padding:"9px 16px",borderBottom:i<byCat.length-1?"1px solid "+T.bg:"none",background:i%2===0?T.bg:T.panel,alignItems:"center"}}><span style={{fontSize:12,color:T.text}}>{c.cat}</span><span style={{fontSize:12,color:T.mid}}>{c.tasks.length}</span><div><div style={{fontSize:12,color:T.amber,marginBottom:1}}>{c.prog}%</div><div style={{height:3,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:c.prog+"%",background:T.amber,borderRadius:99}}/></div></div><span style={{fontSize:12,color:c.budget>0?"#38bdf8":T.dim}}>{c.budget>0?"PKR "+fmtM(c.budget):"—"}</span><span style={{fontSize:12,color:T.green}}>PKR {fmtM(c.paid)}</span><span style={{fontSize:12,color:c.budget>0?T.amber:T.dim}}>{c.budget>0?"PKR "+fmtM(c.budget-c.paid):"—"}</span></div>))}
+          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:16}}><div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>Tasks by Status</div>{byStatus.map(s=>(<div key={s.label} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}><span style={{color:s.color}}>{s.label}</span><span style={{color:T.mid}}>{s.count}</span></div><div style={{height:7,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:(s.count/TASKS.length*100)+"%",background:s.color,borderRadius:99}}/></div></div>))}</div>
+          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:16}}><div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>Budget by Category</div>{byCat.map(c=>{ const pct=c.budget>0?Math.round(c.paid/c.budget*100):0; return(<div key={c.cat} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}><span style={{color:c.color}}>{c.cat} ({c.tasks.length})</span><span style={{color:T.mid}}>PKR {fmtM(c.budget)} · {pct}%</span></div><div style={{height:6,background:c.color+"33",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:pct+"%",background:c.color,borderRadius:99}}/></div></div>); })}</div>
         </div>
       </div>
     );
   }
 
-  // ─── LOG ──────────────────────────────────────────────────────────────────
   function Log(){
     return(
       <div style={{maxWidth:720,margin:"0 auto",padding:16}}>
@@ -742,7 +651,6 @@ function Root(){
     );
   }
 
-  // ─── BRIEFING ─────────────────────────────────────────────────────────────
   function Briefing(){
     return(
       <div style={{maxWidth:680,margin:"0 auto",padding:16}}>
@@ -757,22 +665,15 @@ function Root(){
     );
   }
 
-  // ─── RENDER ───────────────────────────────────────────────────────────────
   return(
     <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Segoe UI',Arial,sans-serif"}}>
       <Nav/>
-      {page==="dashboard" && <Dashboard/>}
-      {page==="task" && activeTask && (
-        <TaskPage key={tid} task={activeTask} name={data.names[tid]} taskData={data.tasks[tid]}
-          perm={user.perm} canEdit={canEdit}
-          onSave={d=>saveTask(tid,d)} onBack={()=>setPage("dashboard")}
-          onAddPay={p=>addPay(tid,p)} onDelPay={pid=>delPay(tid,pid)}
-          onAddPhoto={p=>addPhoto(tid,p)} onDelPhoto={pid=>delPhoto(tid,pid)}/>
-      )}
-      {page==="payments"  && <Payments/>}
-      {page==="analytics" && <Analytics/>}
-      {page==="log"       && <Log/>}
-      {page==="briefing"  && <Briefing/>}
+      {page==="dashboard"&&<Dashboard/>}
+      {page==="task"&&activeTask&&<TaskPage key={tid} task={activeTask} name={data.names[tid]} taskData={data.tasks[tid]} perm={user.perm} canEdit={canEdit} onSave={d=>saveTask(tid,d)} onBack={()=>setPage("dashboard")} onAddPay={p=>addPay(tid,p)} onDelPay={pid=>delPay(tid,pid)} onAddPhoto={p=>addPhoto(tid,p)} onDelPhoto={pid=>delPhoto(tid,pid)}/>}
+      {page==="payments"&&<Payments/>}
+      {page==="analytics"&&<Analytics/>}
+      {page==="log"&&<Log/>}
+      {page==="briefing"&&<Briefing/>}
     </div>
   );
 }
