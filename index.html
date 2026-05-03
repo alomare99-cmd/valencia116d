@@ -4,27 +4,34 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Valencia 116-D</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:#07090f;color:#cbd5e1;font-family:'Segoe UI',Arial,sans-serif;}
+body{background:#07090f;color:#cbd5e1;font-family:'Segoe UI',Arial,sans-serif;min-height:100vh;}
+button{cursor:pointer;font-family:inherit;}
+input,select,textarea{font-family:inherit;background:#07090f;color:#cbd5e1;border:1px solid #1a2030;border-radius:8px;padding:8px 11px;font-size:13px;outline:none;width:100%;box-sizing:border-box;}
+select option{background:#07090f;}
+input[type=range]{border:none;background:transparent;padding:0;}
+textarea{resize:vertical;line-height:1.6;}
 ::-webkit-scrollbar{width:5px;} ::-webkit-scrollbar-track{background:#0d1117;} ::-webkit-scrollbar-thumb{background:#1a2030;border-radius:9px;}
-select option{background:#07090f;} input[type=range]{width:100%;}
 @keyframes spin{to{transform:rotate(360deg)}}
+.spin{width:48px;height:48px;border:4px solid #1a2030;border-top-color:#a78bfa;border-radius:50%;animation:spin 1s linear infinite;}
+.card{background:#0d1117;border:1px solid #1a2030;border-radius:13px;padding:14px;position:relative;overflow:hidden;}
+.chip{display:inline-block;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:99px;}
+.btn{border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;}
+.grid{display:grid;gap:12px;}
+.hidden{display:none!important;}
+#app{min-height:100vh;}
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const {useState,useRef,useMemo,useEffect,useCallback} = React;
-
-/* ── JSONBIN ── */
+<div id="app"></div>
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
 const JKEY = "$2a$10$ecFrK4rlHLNxqPQ4EWDiOORHEKfmbia34dQ3kLN7BTUHAcYbq1G5q";
 const JURL = "https://api.jsonbin.io/v3/b";
 let BIN_ID = localStorage.getItem("vlc_bin_id") || null;
 
+// ─── DB ───────────────────────────────────────────────────────────────────────
 async function dbLoad(){
   try{
     if(!BIN_ID){
@@ -38,17 +45,17 @@ async function dbLoad(){
     const d=await r.json();
     if(d.record?._init) return null;
     return d.record||null;
-  }catch(e){console.error(e);return null;}
+  }catch(e){console.error("Load:",e);return null;}
 }
 async function dbSave(data){
   try{
     if(!BIN_ID) return false;
     const r=await fetch(JURL+"/"+BIN_ID,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":JKEY},body:JSON.stringify(data)});
     return r.ok;
-  }catch(e){console.error(e);return false;}
+  }catch(e){console.error("Save:",e);return false;}
 }
 
-/* ── CONSTANTS ── */
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const USERS=[
   {id:"omer",  name:"Omer",        role:"Owner",          pin:"2123",color:"#a78bfa",icon:"👑",perm:"all"},
   {id:"office",name:"Office",      role:"Project Manager",pin:"9999",color:"#38bdf8",icon:"🏢",perm:"payments_only"},
@@ -56,619 +63,823 @@ const USERS=[
 ];
 const PROJECT={name:"Plot 116-D Valencia Town",client:"Mr. Omer",architect:"Ar. Fazeel Amjad",firm:"GharPlans.pk",plotSize:"75′×120′",totalArea:"13,704 sqft"};
 const TASKS=[
-  {id:1, name:"Plumbing",                  icon:"🔧",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"P-02→P-09",details:["Sewerage traps all floors","Submersible pumps ×2","UGWT+OHWT at Roof","Hot water lines","Pool drain plumbing","Gas pipe","Sunken slabs wet areas"],scope:"13+ wet areas, pool machine room, 3 kitchens"},
-  {id:2, name:"Electrification",           icon:"⚡",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-01→E-09",details:["DB boards + full wiring","CCTV 8 cameras","Dumb waiter electrical","Double-height lounge wiring","Earthing + surge protection"],scope:"All rooms, lounge, pool, quarters"},
-  {id:3, name:"Floor Finalization",        icon:"🏗️",cat:"Structural",   priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"Structural sheets",details:["GF: PCC+ballast+finish","1st slab: RCC+ballast+PCC","Roof: polythene+bitumen+tiles","Depressed slabs bathrooms","Pool deck 23′×12′"],scope:"All floors, terraces, pool deck"},
-  {id:4, name:"Boundary Walls",            icon:"🧱",cat:"Exterior",     priority:"high",    floors:["Ground Level"],ref:"A-02,A-07",details:["Front wall 75′","Side walls 120′ each","Rear wall 75′","Gate pillars+pedestrian gate","Compound plaster+paint","Water body feature wall"],scope:"Full 75′×120′ perimeter"},
-  {id:5, name:"Roof/Quarters & Canopies",  icon:"🏠",cat:"Exterior",     priority:"high",    floors:["Roof/Quarters"],ref:"A-10→A-16",details:["Twin hip roofs dark grey tiles","Porch canopy 25′×15′","Balcony overhangs GF+1F","Quarters verandah canopy","SQ-1 & SQ-2 rooms","Quarters kitchen+bath+lobby","Roof insulation polythene+bitumen"],scope:"Twin roof, porch, 4 balconies, quarters SQ1+SQ2"},
-  {id:6, name:"UPVC Windows",              icon:"🪟",cat:"Finishing",    priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-18→A-21",details:["Basement 4 large openings","Ground double-height 14′×22′","First taller 7′ to 8′-6″","Roof/Quarters W 8′×3′-6″ ×2","~40+ openings total"],scope:"~40 window openings"},
-  {id:7, name:"Floor Tiles",               icon:"⬜",cat:"Finishing",    priority:"medium",  floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"Floor detail",details:["Basement: Entertainment,Theatre,Guest","Ground: Lounge,Dining,Kitchen,Master","First: Master,Beds,Lounge,Kitchen","Quarters: SQ-1,SQ-2,Lobby","All bathrooms anti-slip","Terraces outdoor-rated"],scope:"~13,700 sqft total"},
-  {id:8, name:"Pool (Tiles & Pump)",       icon:"🏊",cat:"Exterior",     priority:"medium",  floors:["Basement"],ref:"P-02,A-06",details:["Pool 15′×30′ basement","Pool deck 23′×12′","Machine room+pumps","Sump pit 4′×2′×5′","Shower+changing area"],scope:"Basement pool zone"},
-  {id:9, name:"Stairs Finalization",       icon:"🪜",cat:"Structural",   priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-06→A-08",details:["SC-1 B→GF Cantilever 20 risers","SC-2 B→Pool RCC 19 risers","SC-3 GF→1F Cantilever 21 risers","SC-4 1F→Roof Cantilever 21 risers","MS/glass railing"],scope:"4 staircases"},
-  {id:10,name:"Woodwork & Closets",        icon:"🪵",cat:"Interior",     priority:"medium",  floors:["Ground Floor","First Floor"],ref:"A-07,A-08",details:["Ground: WI Closet 9′×10′","First: WI Closet 14′×8′","4 Media walls","Kitchen joinery"],scope:"5 walk-in closets, 4 media walls"},
-  {id:11,name:"Doors Installation",        icon:"🚪",cat:"Interior",     priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-18→A-21",details:["Basement 9 doors","Ground 11 doors entrance 8′","First 9 doors","Roof/Quarters 6 doors","~35 total"],scope:"~35 door openings"},
-  {id:12,name:"Sanitary Fittings",         icon:"🚿",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"P-02→P-09",details:["Basement: Guest Bath+Pool Shower","Ground: Master Bath,S.Bath,PWD","First: Shared Bath,Dress/Bath ×2","Quarters: Bath+kitchen sink","3 kitchens"],scope:"12 bathrooms, 3 kitchens"},
-  {id:13,name:"Lights & Fixtures",         icon:"💡",cat:"Interior",     priority:"medium",  floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-02→E-05",details:["Lounge chandelier","Porch recessed downlights","Basement cove lighting","Theatre dimmable","Pool underwater LED","Facade uplighters"],scope:"All 35+ rooms, outdoor, pool"},
-  {id:14,name:"Boundary Wall Works",       icon:"🏰",cat:"Exterior",     priority:"high",    floors:["Ground Level"],ref:"Site boundary",details:["Motorised entrance gate","Pedestrian gate","Coping+weatherproofing","Exterior plaster+paint","Driveway paving 20′","Compound lighting","Security intercom"],scope:"Full perimeter, gates, driveway"},
-  {id:15,name:"Garage Works",              icon:"🚗",cat:"Exterior",     priority:"high",    floors:["Ground Level"],ref:"A-02,A-07",details:["3-car porch 25′×15′ anti-slip","Bike garage 9′×9′ roller shutter","Car wash drainage","Basement ramp vehicle access","Garage door automation","Driveway drainage"],scope:"3-car porch, bike garage, ramp"},
-  {id:16,name:"Solar Installation",        icon:"☀️",cat:"Infrastructure",priority:"medium",  floors:["Roof/Quarters"],ref:"Electrical drawings",details:["System sizing per floor load","South-facing panels on roof","Inverter room Roof/Quarters","DC cable to inverter","Net metering LESCO","Surge protection","Monitoring display"],scope:"Roof panels, inverter room, DB integration"},
-  {id:17,name:"AC Works",                  icon:"❄️",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-01→E-09",details:["Basement 3 cassette units","Ground 4-5 units","First 4 units","Roof/Quarters 1-2 units","Compressor pads","Copper refrigerant lines","Condensate drains","Gas charging+commissioning"],scope:"12-15 AC units across all floors"},
+  {id:1, name:"Plumbing",                 icon:"🔧",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"P-02→P-09",details:["Sewerage traps all floors","Submersible pumps ×2","UGWT+OHWT at Roof","Hot water lines","Pool drain plumbing","Gas pipe","Sunken slabs wet areas"],scope:"13+ wet areas, pool machine room, 3 kitchens"},
+  {id:2, name:"Electrification",          icon:"⚡",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-01→E-09",details:["DB boards + full wiring","CCTV 8 cameras","Dumb waiter electrical","Double-height lounge wiring","Earthing + surge protection"],scope:"All rooms, lounge, pool, quarters"},
+  {id:3, name:"Floor Finalization",       icon:"🏗️",cat:"Structural",   priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"Structural sheets",details:["GF: PCC+ballast+finish","1st slab: RCC+ballast+PCC","Roof: polythene+bitumen+tiles","Depressed slabs bathrooms","Pool deck 23′×12′"],scope:"All floors, terraces, pool deck"},
+  {id:4, name:"Boundary Walls",           icon:"🧱",cat:"Exterior",     priority:"high",    floors:["Ground Level"],ref:"A-02,A-07",details:["Front wall 75′","Side walls 120′ each","Rear wall 75′","Gate pillars+pedestrian gate","Compound plaster+paint","Water body feature wall"],scope:"Full 75′×120′ perimeter"},
+  {id:5, name:"Roof/Quarters & Canopies", icon:"🏠",cat:"Exterior",     priority:"high",    floors:["Roof/Quarters"],ref:"A-10→A-16",details:["Twin hip roofs dark grey tiles","Porch canopy 25′×15′","Balcony overhangs GF+1F","Quarters verandah canopy","SQ-1 & SQ-2 rooms","Quarters kitchen+bath+lobby","Roof insulation polythene+bitumen"],scope:"Twin roof, porch, 4 balconies, quarters"},
+  {id:6, name:"UPVC Windows",             icon:"🪟",cat:"Finishing",    priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-18→A-21",details:["Basement 4 large openings","Ground double-height 14′×22′","First taller 7′ to 8′-6″","Roof/Quarters W 8′×3′-6″ ×2","~40+ openings total"],scope:"~40 window openings"},
+  {id:7, name:"Floor Tiles",              icon:"⬜",cat:"Finishing",    priority:"medium",  floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"Floor detail",details:["Basement: Entertainment,Theatre,Guest","Ground: Lounge,Dining,Kitchen,Master","First: Master,Beds,Lounge,Kitchen","Quarters: SQ-1,SQ-2,Lobby","All bathrooms anti-slip","Terraces outdoor-rated"],scope:"~13,700 sqft total"},
+  {id:8, name:"Pool (Tiles & Pump)",      icon:"🏊",cat:"Exterior",     priority:"medium",  floors:["Basement"],ref:"P-02,A-06",details:["Pool 15′×30′ basement","Pool deck 23′×12′","Machine room+pumps","Sump pit 4′×2′×5′","Shower+changing area"],scope:"Basement pool zone"},
+  {id:9, name:"Stairs Finalization",      icon:"🪜",cat:"Structural",   priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-06→A-08",details:["SC-1 B→GF Cantilever 20 risers","SC-2 B→Pool RCC 19 risers","SC-3 GF→1F Cantilever 21 risers","SC-4 1F→Roof Cantilever 21 risers","MS/glass railing"],scope:"4 staircases"},
+  {id:10,name:"Woodwork & Closets",       icon:"🪵",cat:"Interior",     priority:"medium",  floors:["Ground Floor","First Floor"],ref:"A-07,A-08",details:["Ground: WI Closet 9′×10′","First: WI Closet 14′×8′","4 Media walls","Kitchen joinery"],scope:"5 walk-in closets, 4 media walls"},
+  {id:11,name:"Doors Installation",       icon:"🚪",cat:"Interior",     priority:"high",    floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"A-18→A-21",details:["Basement 9 doors","Ground 11 doors entrance 8′","First 9 doors","Roof/Quarters 6 doors","~35 total"],scope:"~35 door openings"},
+  {id:12,name:"Sanitary Fittings",        icon:"🚿",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"P-02→P-09",details:["Basement: Guest Bath+Pool Shower","Ground: Master Bath,S.Bath,PWD","First: Shared Bath,Dress/Bath ×2","Quarters: Bath+kitchen sink","3 kitchens"],scope:"12 bathrooms, 3 kitchens"},
+  {id:13,name:"Lights & Fixtures",        icon:"💡",cat:"Interior",     priority:"medium",  floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-02→E-05",details:["Lounge chandelier","Porch recessed downlights","Basement cove lighting","Theatre dimmable","Pool underwater LED","Facade uplighters"],scope:"All 35+ rooms, outdoor, pool"},
+  {id:14,name:"Boundary Wall Works",      icon:"🏰",cat:"Exterior",     priority:"high",    floors:["Ground Level"],ref:"Site boundary",details:["Motorised entrance gate","Pedestrian gate","Coping+weatherproofing","Exterior plaster+paint","Driveway paving 20′","Compound lighting","Security intercom"],scope:"Full perimeter, gates, driveway"},
+  {id:15,name:"Garage Works",             icon:"🚗",cat:"Exterior",     priority:"high",    floors:["Ground Level"],ref:"A-02,A-07",details:["3-car porch 25′×15′ anti-slip","Bike garage 9′×9′ roller shutter","Car wash drainage","Basement ramp vehicle access","Garage door automation","Driveway drainage"],scope:"3-car porch, bike garage, ramp"},
+  {id:16,name:"Solar Installation",       icon:"☀️",cat:"Infrastructure",priority:"medium",  floors:["Roof/Quarters"],ref:"Electrical drawings",details:["System sizing per floor load","South-facing panels on roof","Inverter room Roof/Quarters","DC cable to inverter","Net metering LESCO","Surge protection","Monitoring display"],scope:"Roof panels, inverter room, DB"},
+  {id:17,name:"AC Works",                 icon:"❄️",cat:"Infrastructure",priority:"critical",floors:["Basement","Ground Floor","First Floor","Roof/Quarters"],ref:"E-01→E-09",details:["Basement 3 cassette units","Ground 4-5 units","First 4 units","Roof/Quarters 1-2 units","Compressor pads","Copper refrigerant lines","Condensate drains","Gas charging+commissioning"],scope:"12-15 AC units across all floors"},
 ];
-const STATUS  ={"not-started":{label:"Not Started",color:"#64748b"},"in-progress":{label:"In Progress",color:"#f59e0b"},"completed":{label:"Completed",color:"#22c55e"},"blocked":{label:"Blocked",color:"#f43f5e"}};
-const PRICLR  ={critical:"#f43f5e",high:"#fb923c",medium:"#38bdf8"};
-const METHODS =["Cash","Bank Transfer","Cheque","Online Transfer","JazzCash","EasyPaisa"];
-const UNITS   =["bags","tons","cft","sft","rft","nos","kg","ltr","boxes","pcs"];
-const CATS    =["All",...[...new Set(TASKS.map(t=>t.cat))]];
-const FLOORS  =["All","Basement","Ground Floor","First Floor","Roof/Quarters","Ground Level"];
+const STATUS={"not-started":{label:"Not Started",color:"#64748b"},"in-progress":{label:"In Progress",color:"#f59e0b"},"completed":{label:"Completed",color:"#22c55e"},"blocked":{label:"Blocked",color:"#f43f5e"}};
+const PRICLR={critical:"#f43f5e",high:"#fb923c",medium:"#38bdf8"};
+const METHODS=["Cash","Bank Transfer","Cheque","Online Transfer","JazzCash","EasyPaisa"];
+const UNITS=["bags","tons","cft","sft","rft","nos","kg","ltr","boxes","pcs"];
 
-const fmt  = n=>"PKR "+Number(n||0).toLocaleString("en-PK");
-const fmtM = n=>n>=1e6?(n/1e6).toFixed(2)+"M":n>=1000?Math.round(n/1000)+"K":String(n||0);
-const now  = ()=>new Date().toLocaleString("en-PK",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
-const today= ()=>new Date().toISOString().slice(0,10);
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const fmt=n=>"PKR "+Number(n||0).toLocaleString("en-PK");
+const fmtM=n=>n>=1e6?(n/1e6).toFixed(2)+"M":n>=1000?Math.round(n/1000)+"K":String(n||0);
+const nowStr=()=>new Date().toLocaleString("en-PK",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+const todayStr=()=>new Date().toISOString().slice(0,10);
+const el=(tag,attrs={},children=[])=>{
+  const e=document.createElement(tag);
+  Object.entries(attrs).forEach(([k,v])=>{
+    if(k==="style"&&typeof v==="object") Object.assign(e.style,v);
+    else if(k.startsWith("on")) e.addEventListener(k.slice(2).toLowerCase(),v);
+    else if(k==="className") e.className=v;
+    else e.setAttribute(k,v);
+  });
+  children.forEach(c=>{ if(c==null) return; e.appendChild(typeof c==="string"?document.createTextNode(c):c); });
+  return e;
+};
+const div=(s,ch)=>el("div",{style:s},ch);
+const span=(s,t)=>el("span",{style:s},[t]);
+const btn=(txt,bg,fg,cb,extra={})=>{
+  const b=el("button",{style:{background:bg,color:fg||"#fff",border:"none",borderRadius:"8px",padding:"8px 14px",fontSize:"12px",fontWeight:"600",...extra}});
+  b.textContent=txt; b.onclick=cb; return b;
+};
+const inp=(placeholder,type="text",val="")=>{
+  const i=el("input",{type,placeholder});
+  i.value=val; return i;
+};
+const chip=(text,color)=>{
+  const s=el("span",{className:"chip",style:{border:`1px solid ${color}55`,background:`${color}18`,color}});
+  s.textContent=text; return s;
+};
 
-/* ── DEFAULT DATA ── */
+// ─── APP STATE ────────────────────────────────────────────────────────────────
+let USER=null;
+let DATA=null;
+let PAGE="dashboard";
+let TASK_ID=null;
+let PAY_TAB="task";
+let FILTER={fl:"All",cat:"All",st:"All",srch:""};
+
 function mkData(){
   return{
-    names: TASKS.reduce((a,t)=>({...a,[t.id]:t.name}),{}),
-    tasks: TASKS.reduce((a,t)=>({...a,[t.id]:{status:"not-started",progress:0,notes:"",updatedBy:null,history:[],budget:{total:0,paid:0,payments:[]},contractor:{name:"",phone:"",co:""},photos:[]}}),{}),
+    names:TASKS.reduce((a,t)=>({...a,[t.id]:t.name}),{}),
+    tasks:TASKS.reduce((a,t)=>({...a,[t.id]:{status:"not-started",progress:0,notes:"",updatedBy:null,history:[],budget:{total:0,paid:0,payments:[]},contractor:{name:"",phone:"",co:""},photos:[]}}),{}),
     labour:[],mats:[],log:[],
   };
 }
 function mergeData(saved){
   const base=mkData();
   if(!saved) return base;
-  const merged={...base,...saved};
-  TASKS.forEach(t=>{
-    if(!merged.tasks[t.id]) merged.tasks[t.id]=base.tasks[t.id];
-    if(!merged.names[t.id]) merged.names[t.id]=t.name;
-  });
-  return merged;
+  const m={...base,...saved};
+  TASKS.forEach(t=>{ if(!m.tasks[t.id]) m.tasks[t.id]=base.tasks[t.id]; if(!m.names[t.id]) m.names[t.id]=t.name; });
+  return m;
+}
+let saveTimer=null;
+function saveData(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async()=>{
+    const ok=await dbSave(DATA);
+    const msg=document.getElementById("save-msg");
+    if(msg){ msg.textContent=ok?"✓ Saved":"⚠ Save failed"; msg.style.color=ok?"#22c55e":"#f43f5e"; setTimeout(()=>{if(msg)msg.textContent="";},3000); }
+  },600);
+}
+function addLog(action,detail=""){
+  if(!USER) return;
+  DATA.log=[{id:Date.now(),time:nowStr(),who:USER.name,wid:USER.id,action,detail},...(DATA.log||[]).slice(0,199)];
+  saveData();
 }
 
-/* ── THEME ── */
-const T={bg:"#07090f",panel:"#0d1117",border:"#1a2030",dim:"#334155",mid:"#475569",text:"#cbd5e1",hi:"#f1f5f9",green:"#22c55e",amber:"#f59e0b",red:"#f43f5e",purple:"#a78bfa"};
-const IS=(x={})=>({background:T.bg,border:"1px solid "+T.border,borderRadius:8,padding:"8px 11px",color:T.text,fontSize:13,outline:"none",fontFamily:"inherit",width:"100%",boxSizing:"border-box",...x});
-const BS=(bg,fg="#fff",x={})=>({background:bg,color:fg,border:"none",borderRadius:8,padding:"8px 14px",fontSize:12,cursor:"pointer",fontWeight:600,fontFamily:"inherit",...x});
-const CH=(c)=>({display:"inline-block",fontSize:9,fontWeight:700,letterSpacing:1,textTransform:"uppercase",padding:"2px 7px",borderRadius:99,border:"1px solid "+c+"55",background:c+"18",color:c});
-const LB=(t)=><div style={{fontSize:10,color:T.mid,letterSpacing:1,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>{t}</div>;
-
-/* ════════════════ LOGIN ════════════════ */
-function LoginScreen({onLogin}){
-  const [sel,setSel]=useState(null);
-  const [pin,setPin]=useState("");
-  const [err,setErr]=useState("");
-  function pick(u){ if(!u.pin){onLogin(u);}else{setSel(u);setPin("");setErr("");} }
-  function attempt(){ if(!sel)return; if(pin===sel.pin){onLogin(sel);}else{setErr("Incorrect PIN");setPin("");} }
-  return(
-    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:18,padding:40,width:340,textAlign:"center",boxShadow:"0 24px 64px #00000088"}}>
-        <div style={{fontSize:48,marginBottom:10}}>🏡</div>
-        <div style={{fontSize:20,color:T.hi,fontWeight:700,marginBottom:4}}>Valencia 116-D</div>
-        <div style={{fontSize:12,color:T.mid,marginBottom:4}}>{PROJECT.name}</div>
-        <div style={{fontSize:11,color:T.dim,marginBottom:28}}>{PROJECT.plotSize} · {PROJECT.totalArea}</div>
-        {!sel?(
-          <>
-            <div style={{fontSize:11,color:T.mid,marginBottom:14,textTransform:"uppercase",letterSpacing:1.5,fontWeight:600}}>Select Profile</div>
-            {USERS.map(u=>(
-              <button key={u.id} onClick={()=>pick(u)}
-                style={{width:"100%",marginBottom:10,padding:"14px 16px",textAlign:"left",display:"flex",alignItems:"center",gap:14,border:"1px solid "+T.border,borderRadius:12,background:T.border,cursor:"pointer",fontFamily:"inherit"}}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor=u.color;e.currentTarget.style.background=u.color+"22";}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.border;}}>
-                <span style={{fontSize:26}}>{u.icon}</span>
-                <div style={{flex:1,textAlign:"left"}}><div style={{fontSize:14,color:T.hi,fontWeight:600}}>{u.name}</div><div style={{fontSize:11,color:u.color,marginTop:2}}>{u.role}</div></div>
-                <span style={{fontSize:12,color:T.dim}}>{u.pin?"🔒":"→"}</span>
-              </button>
-            ))}
-          </>
-        ):(
-          <>
-            <div style={{fontSize:28,marginBottom:6}}>{sel.icon}</div>
-            <div style={{fontSize:15,color:T.hi,fontWeight:600,marginBottom:2}}>{sel.name}</div>
-            <div style={{fontSize:11,color:sel.color,marginBottom:20}}>{sel.role}</div>
-            {LB("Enter PIN")}
-            <input type="password" value={pin} maxLength={6} autoFocus
-              onChange={e=>setPin(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&attempt()}
-              placeholder="••••"
-              style={IS({textAlign:"center",fontSize:24,letterSpacing:10,marginBottom:8,padding:"12px"})}/>
-            {err&&<div style={{fontSize:11,color:T.red,marginBottom:8}}>{err}</div>}
-            <div style={{display:"flex",gap:8,marginTop:8}}>
-              <button onClick={()=>setSel(null)} style={BS(T.border,T.mid,{flex:1})}>← Back</button>
-              <button onClick={attempt} style={BS(sel.color,"#000",{flex:1,fontWeight:700})}>Login</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
+// ─── RENDER ENGINE ────────────────────────────────────────────────────────────
+function render(){
+  const app=document.getElementById("app");
+  app.innerHTML="";
+  if(!USER){ app.appendChild(renderLogin()); return; }
+  const wrap=div({});
+  wrap.appendChild(renderNav());
+  const body=div({maxWidth:"1060px",margin:"0 auto",padding:"16px"});
+  if(PAGE==="dashboard") body.appendChild(renderDashboard());
+  else if(PAGE==="task"&&TASK_ID) body.appendChild(renderTaskPage());
+  else if(PAGE==="payments") body.appendChild(renderPayments());
+  else if(PAGE==="analytics") body.appendChild(renderAnalytics());
+  else if(PAGE==="log") body.appendChild(renderLog());
+  else if(PAGE==="briefing") body.appendChild(renderBriefing());
+  wrap.appendChild(body);
+  app.appendChild(wrap);
 }
 
-/* ════════════════ SMALL COMPONENTS ════════════════ */
-function NameEdit({id,name,canEdit,onSave}){
-  const [e,setE]=useState(false);
-  const [v,setV]=useState(name);
-  const commit=()=>{ if(v.trim()) onSave(id,v.trim()); setE(false); };
-  if(!canEdit||!e) return <div style={{fontWeight:700,fontSize:13,color:T.hi,marginBottom:2,display:"flex",alignItems:"center",gap:5}}><span>{name}</span>{canEdit&&<span onClick={ev=>{ev.stopPropagation();setE(true);setV(name);}} style={{fontSize:9,color:T.dim,cursor:"pointer",opacity:.5}}>✏️</span>}</div>;
-  return <input autoFocus value={v} onChange={ev=>setV(ev.target.value)} onBlur={commit} onKeyDown={ev=>{if(ev.key==="Enter")commit();if(ev.key==="Escape")setE(false);}} onClick={ev=>ev.stopPropagation()} style={IS({fontSize:13,padding:"3px 7px",fontWeight:600,marginBottom:2})}/>;
-}
+// ─── LOGIN ────────────────────────────────────────────────────────────────────
+function renderLogin(){
+  let pinSel=null;
+  const root=div({minHeight:"100vh",background:"#07090f",display:"flex",alignItems:"center",justifyContent:"center"});
+  const box=div({background:"#0d1117",border:"1px solid #1a2030",borderRadius:"18px",padding:"40px",width:"340px",textAlign:"center",boxShadow:"0 24px 64px #00000088"});
 
-function LabourForm({onAdd}){
-  const [a,setA]=useState(""); const [d,setD]=useState(today()); const [w,setW]=useState(""); const [wk,setWk]=useState(""); const [m,setM]=useState("Cash"); const [n,setN]=useState("");
-  function go(){ const amt=Number(a); if(!amt||amt<=0)return; onAdd({amount:amt,date:d,worker:wk,work:w,method:m,note:n}); setA("");setWk("");setW("");setN(""); }
-  return(
-    <div style={{background:T.panel,border:"1px solid #7c2d1244",borderRadius:12,padding:16,marginBottom:14}}>
-      <div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>➕ Record Labour Payment</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
-        <input type="number" value={a}  onChange={e=>setA(e.target.value)}  placeholder="Amount (PKR) *" style={IS({color:T.green,fontWeight:600})}/>
-        <input type="date"   value={d}  onChange={e=>setD(e.target.value)}  style={IS()}/>
-        <select              value={m}  onChange={e=>setM(e.target.value)}  style={IS()}>{METHODS.map(x=><option key={x}>{x}</option>)}</select>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-        <input value={wk} onChange={e=>setWk(e.target.value)} placeholder="Worker name"        style={IS()}/>
-        <input value={w}  onChange={e=>setW(e.target.value)}  placeholder="Work description *" style={IS()}/>
-        <input value={n}  onChange={e=>setN(e.target.value)}  placeholder="Note / reference"   style={IS()}/>
-      </div>
-      <button onClick={go} disabled={!a||Number(a)<=0} style={BS("#7c2d12","#fed7aa",{width:"100%",padding:"9px",opacity:!a||Number(a)<=0?.5:1})}>+ Record Labour Payment</button>
-    </div>
-  );
-}
-
-function MatForm({onAdd}){
-  const [nm,setNm]=useState(""); const [u,setU]=useState("bags"); const [q,setQ]=useState(""); const [d,setD]=useState(today()); const [tp,setTp]=useState("received"); const [r,setR]=useState(""); const [s,setS]=useState(""); const [n,setN]=useState("");
-  function go(){ const qty=Number(q); if(!nm.trim()||!qty||qty<=0)return; onAdd({name:nm.trim(),unit:u,qty,type:tp,date:d,rate:Number(r)||0,supplier:s,note:n}); setQ("");setR("");setN("");setS(""); }
-  return(
-    <div style={{background:T.panel,border:"1px solid #0f766e44",borderRadius:12,padding:16,marginBottom:14}}>
-      <div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>➕ Add Material Entry</div>
-      <div style={{display:"flex",gap:8,marginBottom:12}}>
-        <button onClick={()=>setTp("received")} style={BS(tp==="received"?"#0f766e":T.border,tp==="received"?"#5eead4":T.mid,{flex:1,fontSize:12})}>📥 Received</button>
-        <button onClick={()=>setTp("issued")}   style={BS(tp==="issued"?"#7c1d1d":T.border,tp==="issued"?"#fca5a5":T.mid,{flex:1,fontSize:12})}>📤 Issued</button>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:8,marginBottom:8}}>
-        <input value={nm} onChange={e=>setNm(e.target.value)} placeholder="Material name *" style={IS()}/>
-        <select value={u} onChange={e=>setU(e.target.value)} style={IS()}>{UNITS.map(x=><option key={x}>{x}</option>)}</select>
-        <input type="date" value={d} onChange={e=>setD(e.target.value)} style={IS()}/>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:10}}>
-        <input type="number" value={q} onChange={e=>setQ(e.target.value)} placeholder="Qty *" style={IS({color:tp==="received"?T.green:T.red,fontWeight:600})}/>
-        {tp==="received"&&<input type="number" value={r} onChange={e=>setR(e.target.value)} placeholder="Rate/unit" style={IS()}/>}
-        {tp==="received"&&<input value={s} onChange={e=>setS(e.target.value)} placeholder="Supplier" style={IS()}/>}
-        <input value={n} onChange={e=>setN(e.target.value)} placeholder="Note" style={IS()}/>
-      </div>
-      <button onClick={go} disabled={!nm.trim()||!q} style={BS(tp==="received"?"#0f766e":"#7c1d1d",tp==="received"?"#5eead4":"#fca5a5",{width:"100%",padding:"9px",opacity:!nm.trim()?.5:1})}>
-        {tp==="received"?"📥 Record Receipt":"📤 Record Issue"}
-      </button>
-    </div>
-  );
-}
-
-/* ════════════════ TASK PAGE ════════════════ */
-function TaskPage({task,name,td,perm,canEdit,onSave,onBack,onAddPay,onDelPay,onAddPhoto,onDelPhoto}){
-  const b=td.budget, canAdd=perm!=="payments_only";
-  const pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0;
-  const [st,setSt]=useState(td.status); const [pr,setPr]=useState(td.progress); const [nt,setNt]=useState(td.notes||"");
-  const [bg,setBg]=useState(b.total||""); const [cn,setCn]=useState(td.contractor.name||""); const [cp,setCp]=useState(td.contractor.phone||""); const [cc,setCc]=useState(td.contractor.co||"");
-  const [pa,setPa]=useState(""); const [pd,setPd]=useState(today()); const [pm,setPm]=useState("Cash"); const [pn,setPn]=useState(""); const [pt,setPt]=useState("Payment");
-  const [cap,setCap]=useState(""); const [lb,setLb]=useState(null); const [ai,setAi]=useState(""); const [aiLd,setAiLd]=useState(false);
-  const fRef=useRef();
-  function doSave(){ onSave({status:st,prog:pr,notes:nt,budget:Number(bg)||0,contractor:{name:cn,phone:cp,co:cc}}); }
-  function doPay(){ const a=Number(pa); if(!a||a<=0)return; onAddPay({amount:a,date:pd,method:pm,note:pn,type:pt}); setPa(""); setPn(""); }
-  function doPhoto(e){ const f=e.target.files?.[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{ onAddPhoto({data:ev.target.result,caption:cap||f.name,size:Math.round(f.size/1024)+"KB"}); setCap(""); e.target.value=""; }; r.readAsDataURL(f); }
-  async function doAI(){
-    setAiLd(true); setAi("");
-    try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:900,system:"Senior construction PM Lahore. Concise bullets.",messages:[{role:"user",content:"Task:"+name+" ["+task.priority+"] "+task.ref+"\nStatus:"+td.status+" "+td.progress+"%\nBudget:PKR"+fmtM(b.total)+" Paid:PKR"+fmtM(b.paid)+"\n\n1.⚡ Actions 2.🔍 Checks 3.💰 Budget 4.⏱ Timeline 5.🔗 Dependencies"}]})});
-      const d=await r.json(); setAi(d.error?"⚠️ "+d.error.message:d.content?.map(c=>c.text||"").join("")||"No response.");
-    }catch(e){ setAi("⚠️ "+e.message); }
-    setAiLd(false);
-  }
-  return(
-    <div style={{maxWidth:720,margin:"0 auto",padding:16}}>
-      {lb&&<div onClick={()=>setLb(null)} style={{position:"fixed",inset:0,background:"#000c",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:T.panel,borderRadius:12,overflow:"hidden",maxWidth:700,width:"100%"}}>
-          <img src={lb.data} alt={lb.caption} style={{width:"100%",maxHeight:"70vh",objectFit:"contain",display:"block"}}/>
-          <div style={{padding:"12px 16px",display:"flex",justifyContent:"space-between"}}>
-            <div><div style={{fontSize:13,color:T.hi}}>{lb.caption}</div><div style={{fontSize:10,color:T.dim}}>{lb.by} · {lb.size}</div></div>
-            <button onClick={()=>setLb(null)} style={BS(T.border,T.mid,{fontSize:11})}>✕ Close</button>
-          </div>
-        </div>
-      </div>}
-      <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:14,padding:20}}>
-        {/* header */}
-        <div style={{display:"flex",gap:12,marginBottom:14,paddingBottom:12,borderBottom:"1px solid "+T.border}}>
-          <span style={{fontSize:32}}>{task.icon}</span>
-          <div style={{flex:1}}>
-            <div style={{fontSize:17,color:T.hi,fontWeight:700,marginBottom:2}}>{name}</div>
-            <div style={{fontSize:11,color:T.dim,marginBottom:5}}>{task.cat} · {task.ref}</div>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{task.floors.map(f=><span key={f} style={CH("#38bdf8")}>{f}</span>)}<span style={CH(PRICLR[task.priority])}>{task.priority}</span>{td.updatedBy&&<span style={{fontSize:10,color:T.dim}}>· {td.updatedBy}</span>}</div>
-          </div>
-        </div>
-        {/* specs */}
-        <div style={{background:T.bg,border:"1px solid "+T.border,borderRadius:10,padding:"10px 14px",marginBottom:14}}>
-          {LB("Specifications")}
-          {task.details.map((d,i)=><div key={i} style={{fontSize:12,color:T.dim,lineHeight:1.7}}>• {d}</div>)}
-          <div style={{marginTop:7,paddingTop:7,borderTop:"1px solid "+T.border,fontSize:11,color:"#334155"}}>📐 {task.scope}</div>
-        </div>
-        {/* status + progress */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-          <div>
-            {LB("Status")}
-            {Object.entries(STATUS).map(([k,v])=>(
-              <button key={k} onClick={()=>canEdit&&setSt(k)} style={{background:st===k?v.color+"22":"transparent",color:st===k?v.color:T.mid,border:"1px solid "+(st===k?v.color:T.border),borderRadius:8,fontSize:12,display:"block",width:"100%",textAlign:"left",marginBottom:4,padding:"7px 10px",cursor:canEdit?"pointer":"default",opacity:canEdit?1:.65,fontFamily:"inherit",fontWeight:500}}>{v.label}</button>
-            ))}
-          </div>
-          <div>
-            {LB("Progress — "+pr+"%")}
-            <div style={{height:6,background:T.border,borderRadius:99,overflow:"hidden",marginBottom:8}}><div style={{height:"100%",width:pr+"%",background:T.amber,borderRadius:99}}/></div>
-            <input type="range" min={0} max={100} value={pr} onChange={e=>canEdit&&setPr(+e.target.value)} disabled={!canEdit} style={{marginBottom:12,accentColor:T.amber,opacity:canEdit?1:.5}}/>
-            {LB("Site Notes")}
-            <textarea value={nt} onChange={e=>canEdit&&setNt(e.target.value)} readOnly={!canEdit} rows={4} placeholder={canEdit?"Issues, observations…":"View only — Omer can edit"} style={{...IS(),resize:"vertical",lineHeight:1.6,opacity:canEdit?1:.7}}/>
-          </div>
-        </div>
-        {/* contractor */}
-        <div style={{background:T.bg,border:"1px solid "+T.border,borderRadius:10,padding:"12px 14px",marginBottom:14}}>
-          {LB("👷 Contractor / Vendor")}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-            <input value={cn} onChange={e=>canEdit&&setCn(e.target.value)} readOnly={!canEdit} placeholder="Name"    style={IS({fontSize:12,opacity:canEdit?1:.7})}/>
-            <input value={cp} onChange={e=>canEdit&&setCp(e.target.value)} readOnly={!canEdit} placeholder="Phone"   style={IS({fontSize:12,opacity:canEdit?1:.7})}/>
-            <input value={cc} onChange={e=>canEdit&&setCc(e.target.value)} readOnly={!canEdit} placeholder="Company" style={IS({fontSize:12,opacity:canEdit?1:.7})}/>
-          </div>
-        </div>
-        {/* payments */}
-        <div style={{background:T.bg,border:"1px solid #14532d66",borderRadius:12,padding:16,marginBottom:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{fontSize:13,color:"#86efac",fontWeight:700}}>💳 PAYMENTS</div><div style={{fontSize:11,color:T.mid}}>{(b.payments||[]).length} txns</div></div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:b.total>0?10:14}}>
-            {[{l:"Budget",v:b.total>0?fmt(b.total):"Not set",c:"#38bdf8"},{l:"Paid",v:fmt(b.paid),c:T.green},{l:"Remaining",v:b.total>0?fmt(b.total-b.paid):"—",c:T.amber},{l:"% Paid",v:b.total>0?pp+"%":"—",c:pp>=100?T.red:T.green}].map(x=>(<div key={x.l} style={{background:T.panel,borderRadius:8,padding:"8px 10px",textAlign:"center",border:"1px solid "+T.border}}><div style={{fontSize:9,color:T.dim,textTransform:"uppercase",marginBottom:2}}>{x.l}</div><div style={{fontSize:12,fontWeight:700,color:x.c}}>{x.v}</div></div>))}
-          </div>
-          {b.total>0&&<div style={{height:7,background:T.border,borderRadius:99,overflow:"hidden",marginBottom:14}}><div style={{height:"100%",width:pp+"%",background:pp>=100?"#ef4444":"#22c55e",borderRadius:99}}/></div>}
-          {canEdit&&<>{LB("Budget Estimate (PKR)")}<input type="number" value={bg} onChange={e=>setBg(e.target.value)} placeholder="Enter total budget…" style={IS({marginBottom:12})}/></>}
-          {canAdd&&<div style={{borderTop:"1px solid "+T.border,paddingTop:12,marginBottom:12}}>
-            {LB("Record Payment")}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-              <input type="number" value={pa} onChange={e=>setPa(e.target.value)} placeholder="Amount (PKR) *" style={IS({color:T.green,fontWeight:600})}/>
-              <input type="date"   value={pd} onChange={e=>setPd(e.target.value)} style={IS()}/>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-              <select value={pm} onChange={e=>setPm(e.target.value)} style={IS()}>{METHODS.map(x=><option key={x}>{x}</option>)}</select>
-              <select value={pt} onChange={e=>setPt(e.target.value)} style={IS()}>{["Payment","Advance","Retention","Labour","Material"].map(x=><option key={x}>{x}</option>)}</select>
-              <input  value={pn} onChange={e=>setPn(e.target.value)} placeholder="Note…" style={IS()}/>
-            </div>
-            <button onClick={doPay} disabled={!pa||Number(pa)<=0} style={BS("#14532d","#86efac",{width:"100%",padding:"9px",opacity:!pa||Number(pa)<=0?.5:1})}>+ Record Payment</button>
-          </div>}
-          {(b.payments||[]).length>0&&<div style={{maxHeight:180,overflowY:"auto"}}>{(b.payments||[]).map(p=>(<div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:T.panel,borderRadius:8,marginBottom:4,border:"1px solid "+T.border}}>
-            <div><div style={{display:"flex",gap:5}}><span style={CH("#a78bfa")}>{p.type}</span><span style={CH("#64748b")}>{p.method}</span></div><div style={{fontSize:10,color:T.dim,marginTop:2}}>{p.date} · {p.by}{p.note?" · "+p.note:""}</div></div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:13,color:T.green,fontWeight:700}}>{fmt(p.amount)}</span>{canEdit&&<button onClick={()=>onDelPay(p.id)} style={BS("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
-          </div>))}</div>}
-        </div>
-        {/* photos */}
-        <div style={{background:T.bg,border:"1px solid #1e3a5f",borderRadius:12,padding:16,marginBottom:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><div style={{fontSize:13,color:"#93c5fd",fontWeight:700}}>📷 SITE PHOTOS</div><span style={{fontSize:11,color:T.mid}}>{(td.photos||[]).length} photos</span></div>
-          {canAdd&&<div style={{display:"flex",gap:8,marginBottom:12}}><input value={cap} onChange={e=>setCap(e.target.value)} placeholder="Caption…" style={IS({flex:1})}/><button onClick={()=>fRef.current?.click()} style={BS("#1e3a8a","#93c5fd",{whiteSpace:"nowrap"})}>📁 Upload</button><input ref={fRef} type="file" accept="image/*" style={{display:"none"}} onChange={doPhoto}/></div>}
-          {(td.photos||[]).length===0?<div style={{textAlign:"center",padding:"14px 0",color:T.dim,fontSize:12}}>No photos yet.</div>
-            :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8}}>{(td.photos||[]).map(p=>(<div key={p.id} style={{position:"relative",borderRadius:8,overflow:"hidden",border:"1px solid "+T.border,cursor:"pointer"}} onClick={()=>setLb(p)}><img src={p.data} alt={p.caption} style={{width:"100%",height:90,objectFit:"cover",display:"block"}}/><div style={{padding:"5px 7px",background:T.panel}}><div style={{fontSize:9,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.caption}</div><div style={{fontSize:8,color:T.dim}}>{p.by} · {p.size}</div></div>{canEdit&&<button onClick={e=>{e.stopPropagation();onDelPhoto(p.id);}} style={{position:"absolute",top:4,right:4,background:"#000b",border:"none",borderRadius:99,width:20,height:20,color:"#fff",fontSize:10,cursor:"pointer"}}>✕</button>}</div>))}</div>}
-        </div>
-        {/* actions */}
-        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
-          {canEdit?<button onClick={doSave} style={BS("#1d4ed8")}>💾 Save Changes</button>:<div style={{fontSize:12,color:T.dim,padding:"8px 12px",background:T.bg,borderRadius:8,border:"1px solid "+T.border}}>🔒 View only — Omer can edit</div>}
-          <button onClick={doAI} disabled={aiLd} style={BS("#7c1d1d","#fca5a5",{opacity:aiLd?.7:1})}>{aiLd?"Analyzing…":"🤖 AI Advisor"}</button>
-          <button onClick={onBack} style={BS(T.border,T.mid)}>← Back</button>
-        </div>
-        {(aiLd||ai)&&<div style={{background:"#0a0d14",border:"1px solid #7c1d1d44",borderRadius:10,padding:14,marginBottom:14}}>{LB("🤖 AI Advisor")}{aiLd?<div style={{color:T.dim,fontSize:12}}>Analyzing…</div>:<div style={{fontSize:13,color:T.text,lineHeight:1.85,whiteSpace:"pre-wrap"}}>{ai}</div>}</div>}
-        {(td.history||[]).length>0&&<div>{LB("Update History")}<div style={{maxHeight:160,overflowY:"auto"}}>{(td.history||[]).map((h,i)=>(<div key={i} style={{borderLeft:"2px solid "+T.border,paddingLeft:10,marginBottom:7}}><div style={{fontSize:10,color:T.dim}}>{h.time} · <span style={{color:USERS.find(u=>u.name===h.who)?.color||T.mid}}>{h.who}</span> · <span style={{color:STATUS[h.status]?.color}}>{STATUS[h.status]?.label}</span> · {h.prog}%</div>{h.note&&<div style={{fontSize:11,color:"#1e3a5f",marginTop:1}}>{h.note}</div>}</div>))}</div></div>}
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════ MAIN APP ════════════════ */
-function App(){
-  /* ── state ── */
-  const [loading, setLoading] = useState(true);
-  const [user,    setUser]    = useState(null);   // null = show login
-  const [data,    setData]    = useState(mkData);
-  const [saveMsg, setSaveMsg] = useState("");
-  const [saving,  setSaving]  = useState(false);
-  const [page,    setPage]    = useState("dashboard");
-  const [tid,     setTid]     = useState(null);
-  const [payTab,  setPayTab]  = useState("task");
-  const [payFilt, setPayFilt] = useState("All");
-  const [matFilt, setMatFilt] = useState("All");
-  const [fl,      setFl]      = useState("All");
-  const [cat,     setCat]     = useState("All");
-  const [stF,     setStF]     = useState("All");
-  const [srch,    setSrch]    = useState("");
-  const [brief,   setBrief]   = useState("");
-  const [briefLd, setBriefLd] = useState(false);
-
-  /* ── load on mount ── */
-  useEffect(()=>{
-    dbLoad().then(saved=>{
-      setData(mergeData(saved));
-      setLoading(false);
+  function showPick(){
+    box.innerHTML="";
+    box.appendChild(div({fontSize:"48px",marginBottom:"10px"},["🏡"]));
+    box.appendChild(el("div",{style:{fontSize:"20px",color:"#f1f5f9",fontWeight:"700",marginBottom:"4px"}},["Valencia 116-D"]));
+    box.appendChild(el("div",{style:{fontSize:"12px",color:"#475569",marginBottom:"4px"}},[PROJECT.name]));
+    box.appendChild(el("div",{style:{fontSize:"11px",color:"#334155",marginBottom:"28px"}},[PROJECT.plotSize+" · "+PROJECT.totalArea]));
+    box.appendChild(el("div",{style:{fontSize:"11px",color:"#475569",marginBottom:"14px",textTransform:"uppercase",letterSpacing:"1.5px",fontWeight:"600"}},["Select Profile"]));
+    USERS.forEach(u=>{
+      const b=el("button",{style:{width:"100%",marginBottom:"10px",padding:"14px 16px",textAlign:"left",display:"flex",alignItems:"center",gap:"14px",border:"1px solid #1a2030",borderRadius:"12px",background:"#1a2030",cursor:"pointer",fontFamily:"inherit"}});
+      b.innerHTML=`<span style="font-size:26px">${u.icon}</span><div style="flex:1;text-align:left"><div style="font-size:14px;color:#f1f5f9;font-weight:600">${u.name}</div><div style="font-size:11px;color:${u.color};margin-top:2px">${u.role}</div></div><span style="font-size:12px;color:#334155">${u.pin?"🔒":"→"}</span>`;
+      b.onmouseenter=()=>{ b.style.borderColor=u.color; b.style.background=u.color+"22"; };
+      b.onmouseleave=()=>{ b.style.borderColor="#1a2030"; b.style.background="#1a2030"; };
+      b.onclick=()=>{ if(!u.pin){ doLogin(u); }else{ pinSel=u; showPin(); } };
+      box.appendChild(b);
     });
-  },[]);
-
-  /* ── save helper ── */
-  const save = useCallback(async(d)=>{
-    setSaving(true);
-    const ok=await dbSave(d);
-    setSaveMsg(ok?"✓ Saved":"⚠ Save failed");
-    setTimeout(()=>setSaveMsg(""),3000);
-    setSaving(false);
-  },[]);
-
-  /* ── mutate ── */
-  const mut = useCallback(fn=>{
-    setData(prev=>{ const next=fn(prev); save(next); return next; });
-  },[save]);
-
-  /* ── addLog (safe — takes user object directly) ── */
-  function addLog(u,action,detail){
-    if(!u) return;
-    const entry={id:Date.now(),time:now(),who:u.name,wid:u.id,action,detail:detail||""};
-    setData(prev=>{ const next={...prev,log:[entry,...(prev.log||[]).slice(0,199)]}; save(next); return next; });
   }
 
-  /* ── refresh ── */
-  async function refresh(){
-    setSaveMsg("🔄 Refreshing…");
-    const saved=await dbLoad();
-    setData(mergeData(saved));
-    setSaveMsg("✓ Refreshed");
-    setTimeout(()=>setSaveMsg(""),2000);
+  function showPin(){
+    box.innerHTML="";
+    box.appendChild(div({fontSize:"28px",marginBottom:"6px"},[pinSel.icon]));
+    box.appendChild(el("div",{style:{fontSize:"15px",color:"#f1f5f9",fontWeight:"600",marginBottom:"2px"}},[pinSel.name]));
+    box.appendChild(el("div",{style:{fontSize:"11px",color:pinSel.color,marginBottom:"20px"}},[pinSel.role]));
+    box.appendChild(el("div",{style:{fontSize:"10px",color:"#475569",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:"8px",fontWeight:"600"}},["Enter PIN"]));
+    const pinInp=el("input",{type:"password",maxlength:"6",placeholder:"••••",style:{textAlign:"center",fontSize:"24px",letterSpacing:"10px",marginBottom:"8px",padding:"12px",background:"#07090f",border:"1px solid #1a2030",borderRadius:"8px",color:"#cbd5e1",width:"100%",boxSizing:"border-box"}});
+    const errMsg=el("div",{style:{fontSize:"11px",color:"#f43f5e",marginBottom:"8px",minHeight:"16px"}});
+    const attempt=()=>{ if(pinInp.value===pinSel.pin){ doLogin(pinSel); }else{ errMsg.textContent="Incorrect PIN"; pinInp.value=""; } };
+    pinInp.onkeydown=e=>{ if(e.key==="Enter") attempt(); };
+    box.appendChild(pinInp);
+    box.appendChild(errMsg);
+    const row=div({display:"flex",gap:"8px",marginTop:"8px"});
+    row.appendChild(btn("← Back","#1a2030","#475569",()=>{ pinSel=null; showPick(); },{flex:"1"}));
+    row.appendChild(btn("Login",pinSel.color,"#000",attempt,{flex:"1",fontWeight:"700"}));
+    box.appendChild(row);
+    setTimeout(()=>pinInp.focus(),50);
   }
 
-  /* ── LOGIN HANDLER — no state dependency, completely safe ── */
-  function handleLogin(u){
-    // 1. set user state
-    setUser(u);
-    // 2. set page
-    setPage(u.perm==="payments_only"?"payments":"dashboard");
-    // 3. log directly into data without going through mut/addLog
-    const entry={id:Date.now(),time:now(),who:u.name,wid:u.id,action:"Login",detail:u.name+" logged in"};
-    setData(prev=>{ const next={...prev,log:[entry,...(prev.log||[]).slice(0,199)]}; save(next); return next; });
+  function doLogin(u){
+    USER=u;
+    PAGE=u.perm==="payments_only"?"payments":"dashboard";
+    // log the login
+    DATA.log=[{id:Date.now(),time:nowStr(),who:u.name,wid:u.id,action:"Login",detail:u.name+" logged in"},...(DATA.log||[]).slice(0,199)];
+    saveData();
+    render();
   }
 
-  function handleLogout(){ setUser(null); setPage("dashboard"); }
-
-  /* ── LOADING SCREEN ── */
-  if(loading) return(
-    <div style={{minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
-      <div style={{fontSize:48}}>🏡</div>
-      <div style={{fontSize:18,color:T.hi,fontWeight:700}}>Valencia 116-D</div>
-      <div style={{fontSize:13,color:T.mid}}>Loading project data…</div>
-      <div style={{width:48,height:48,border:"4px solid "+T.border,borderTopColor:"#a78bfa",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
-    </div>
-  );
-
-  /* ── LOGIN SCREEN ── */
-  if(!user) return <LoginScreen onLogin={handleLogin}/>;
-
-  /* ── DERIVED ── */
-  const canEdit  = user.perm==="all";
-  const isOffice = user.perm==="payments_only";
-  const totBudget= Object.values(data.tasks).reduce((s,t)=>s+(t.budget.total||0),0);
-  const totPaid  = Object.values(data.tasks).reduce((s,t)=>s+(t.budget.paid||0),0);
-  const totLabour= (data.labour||[]).reduce((s,l)=>s+l.amount,0);
-  const totProg  = Math.round(Object.values(data.tasks).reduce((s,t)=>s+t.progress,0)/TASKS.length);
-  const cnts={done:0,active:0,blocked:0};
-  Object.values(data.tasks).forEach(t=>{ if(t.status==="completed")cnts.done++; else if(t.status==="in-progress")cnts.active++; else if(t.status==="blocked")cnts.blocked++; });
-  const allPays=TASKS.flatMap(t=>(data.tasks[t.id].budget.payments||[]).map(p=>({...p,tid:t.id,tname:data.names[t.id],ticon:t.icon}))).sort((a,b)=>b.id-a.id);
-  const matStock=useMemo(()=>{ const m={}; (data.mats||[]).forEach(x=>{ if(!m[x.name]) m[x.name]={name:x.name,unit:x.unit,i:0,o:0,v:0}; if(x.type==="received"){m[x.name].i+=x.qty;m[x.name].v+=x.qty*(x.rate||0);}else m[x.name].o+=x.qty; }); return Object.values(m).map(x=>({...x,bal:x.i-x.o})); },[data.mats]);
-  const visTasks=TASKS.filter(t=>{ if(fl!=="All"&&!t.floors.includes(fl))return false; if(cat!=="All"&&t.cat!==cat)return false; if(stF!=="All"&&data.tasks[t.id].status!==stF)return false; if(srch&&!(data.names[t.id]||"").toLowerCase().includes(srch.toLowerCase()))return false; return true; });
-  const activeTask=tid?TASKS.find(t=>t.id===tid):null;
-
-  /* ── MUTATIONS ── */
-  function saveTask(id,d){
-    const n=now();
-    mut(prev=>({...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],status:d.status,progress:d.prog,notes:d.notes,updatedBy:user.name,updatedAt:n,budget:{...prev.tasks[id].budget,total:d.budget},contractor:d.contractor,history:[{time:n,who:user.name,status:d.status,prog:d.prog,note:d.notes},...(prev.tasks[id].history||[]).slice(0,19)]}}}));
-    addLog(user,"Task Updated",data.names[id]+" → "+d.status+" "+d.prog+"%");
-    setPage("dashboard");
-  }
-  function addPay(id,p){ mut(prev=>{ const b=prev.tasks[id].budget; const pays=[{id:Date.now(),...p,by:user.name,at:now()},...(b.payments||[])]; return{...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],budget:{...b,paid:pays.reduce((s,x)=>s+x.amount,0),payments:pays}}}}; }); addLog(user,"Payment","PKR"+fmtM(p.amount)+" "+data.names[id]); }
-  function delPay(tid,pid){ if(!canEdit)return; mut(prev=>{ const b=prev.tasks[tid].budget; const pays=(b.payments||[]).filter(p=>p.id!==pid); return{...prev,tasks:{...prev.tasks,[tid]:{...prev.tasks[tid],budget:{...b,paid:pays.reduce((s,p)=>s+p.amount,0),payments:pays}}}}; }); }
-  function addPhoto(id,p){ mut(prev=>({...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],photos:[{id:Date.now(),...p,by:user.name,at:now()},...(prev.tasks[id].photos||[])]}}})); addLog(user,"Photo Added",data.names[id]); }
-  function delPhoto(id,pid){ if(!canEdit)return; mut(prev=>({...prev,tasks:{...prev.tasks,[id]:{...prev.tasks[id],photos:(prev.tasks[id].photos||[]).filter(p=>p.id!==pid)}}})); }
-  function saveName(id,name){ if(!canEdit)return; mut(prev=>({...prev,names:{...prev.names,[id]:name}})); addLog(user,"Renamed","→ "+name); }
-  function addLabour(l){ mut(prev=>({...prev,labour:[{id:Date.now(),...l,by:user.name,at:now()},...(prev.labour||[])]})); addLog(user,"Labour","PKR"+fmtM(l.amount)+" "+l.work); }
-  function delLabour(id){ if(!canEdit)return; mut(prev=>({...prev,labour:(prev.labour||[]).filter(l=>l.id!==id)})); }
-  function addMat(m){ mut(prev=>({...prev,mats:[{id:Date.now(),...m,by:user.name,at:now()},...(prev.mats||[])]})); addLog(user,"Material "+m.type,m.qty+" "+m.unit+" "+m.name); }
-  function delMat(id){ if(!canEdit)return; mut(prev=>({...prev,mats:(prev.mats||[]).filter(m=>m.id!==id)})); }
-
-  async function getBrief(){
-    setBrief(""); setBriefLd(true); setPage("briefing");
-    const sum=TASKS.map(t=>{ const s=data.tasks[t.id],b=s.budget; return data.names[t.id]+"["+t.priority+"]:"+s.status+"("+s.progress+"%)B:"+fmtM(b.total)+"P:"+fmtM(b.paid); }).join("\n");
-    try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1400,system:"Senior construction PM briefing luxury home Lahore. Structured emoji-rich actionable.",messages:[{role:"user",content:"Project:"+PROJECT.name+"\nBudget:PKR"+fmtM(totBudget)+" Paid:PKR"+fmtM(totPaid)+" Labour:PKR"+fmtM(totLabour)+"\n\n"+sum+"\n\n1.📊 Health 2.🔴 Urgent 3.✅ Top 3 TODAY 4.💰 Finance 5.📅 Timeline"}]})});
-      const d=await r.json(); setBrief(d.error?"⚠️ "+d.error.message:d.content?.map(c=>c.text||"").join("")||"No response.");
-    }catch(e){ setBrief("⚠️ "+e.message); }
-    setBriefLd(false);
-  }
-
-  const navPages=[["dashboard","📋 Tasks"],["payments","💳 Payments"],["analytics","📈 Analytics"],["log","📜 Activity"],["briefing","🤖 AI"]].filter(([p])=>isOffice?p==="payments":true);
-
-  /* ── NAV ── */
-  function Nav(){
-    return(
-      <div style={{background:T.panel,borderBottom:"1px solid "+T.border,padding:"12px 20px",position:"sticky",top:0,zIndex:100}}>
-        <div style={{maxWidth:1060,margin:"0 auto"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-            <div>
-              <div style={{fontSize:9,letterSpacing:3,color:T.dim,textTransform:"uppercase"}}>{PROJECT.firm} · {PROJECT.architect}</div>
-              <div style={{fontSize:16,color:T.hi,fontWeight:700,margin:"3px 0 1px"}}>🏡 {PROJECT.name}</div>
-              <div style={{fontSize:11,color:T.dim}}>{PROJECT.client} · {PROJECT.plotSize} · {PROJECT.totalArea}</div>
-            </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-              {navPages.map(([p,l])=><button key={p} onClick={p==="briefing"?getBrief:()=>setPage(p)} style={BS(page===p?"#1d4ed8":T.border,page===p?"#fff":T.mid,{fontSize:11})}>{l}</button>)}
-              <button onClick={refresh} title="Refresh data" style={BS(T.border,T.mid,{fontSize:11,padding:"8px 10px"})}>🔄</button>
-              <div style={{display:"flex",alignItems:"center",gap:6,background:T.bg,border:"1px solid "+user.color+"44",borderRadius:8,padding:"5px 10px"}}>
-                <span style={{fontSize:14}}>{user.icon}</span>
-                <div><div style={{fontSize:12,color:user.color,fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:T.dim}}>{user.role}</div></div>
-                <button onClick={handleLogout} style={BS("transparent",T.dim,{fontSize:10,padding:"2px 6px"})}>⏏</button>
-              </div>
-              {(saveMsg||saving)&&<span style={{fontSize:10,color:saving?T.amber:saveMsg.startsWith("✓")?T.green:T.red,fontWeight:600}}>{saving?"Saving…":saveMsg}</span>}
-            </div>
-          </div>
-          <div style={{marginTop:10,display:"flex",gap:16,flexWrap:"wrap",alignItems:"center"}}>
-            {[{v:totProg+"%",l:"Progress",c:"#7c3aed"},{v:cnts.active,l:"Active",c:T.amber},{v:cnts.done+"/"+TASKS.length,l:"Done",c:T.green},{v:cnts.blocked,l:"Blocked",c:T.red},{v:"PKR "+fmtM(totPaid),l:"Task Paid",c:T.green},{v:"PKR "+fmtM(totLabour),l:"Labour",c:"#fb923c"},{v:"PKR "+fmtM(totBudget-totPaid),l:"Remaining",c:T.amber}].map(s=>(<div key={s.l} style={{textAlign:"center"}}><div style={{fontSize:14,fontWeight:700,color:s.c,lineHeight:1}}>{s.v}</div><div style={{fontSize:9,color:T.dim,letterSpacing:1,textTransform:"uppercase"}}>{s.l}</div></div>))}
-            <div style={{flex:1,minWidth:80}}><div style={{height:4,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:totProg+"%",background:"linear-gradient(90deg,#7c3aed,#22c55e)",borderRadius:99}}/></div></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /* ── DASHBOARD ── */
-  function Dashboard(){
-    return(
-      <div style={{maxWidth:1060,margin:"0 auto",padding:16}}>
-        <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:"12px 14px",marginBottom:14}}>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-            <input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="🔍 Search…" style={IS({width:150,fontSize:12})}/>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{FLOORS.map(f=><button key={f} onClick={()=>setFl(f)} style={BS(fl===f?"#1e3a5f":T.border,fl===f?"#93c5fd":T.mid,{fontSize:10})}>{f}</button>)}</div>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={BS(cat===c?"#14532d":T.border,cat===c?"#86efac":T.mid,{fontSize:10})}>{c}</button>)}</div>
-            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{["All","not-started","in-progress","completed","blocked"].map(s=><button key={s} onClick={()=>setStF(s)} style={BS(stF===s?(STATUS[s]?.color+"33"||T.border):T.border,stF===s?(STATUS[s]?.color||T.mid):T.mid,{fontSize:10})}>{s==="All"?"All":STATUS[s]?.label}</button>)}</div>
-          </div>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:12}}>
-          {visTasks.map(task=>{
-            const s=data.tasks[task.id],sc=STATUS[s.status],b=s.budget,pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0;
-            return(
-              <div key={task.id} onClick={()=>{ if(!isOffice){setTid(task.id);setPage("task");} }}
-                style={{background:T.panel,border:"1px solid "+(s.status==="completed"?T.green+"33":s.status==="in-progress"?T.amber+"33":s.status==="blocked"?T.red+"33":T.border),borderRadius:13,padding:14,cursor:isOffice?"default":"pointer",position:"relative",overflow:"hidden",transition:"all .15s"}}
-                onMouseEnter={e=>{ if(!isOffice){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px #00000055";} }}
-                onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
-                <div style={{position:"absolute",top:0,left:0,width:3,height:"100%",background:PRICLR[task.priority],borderRadius:"13px 0 0 13px"}}/>
-                <div style={{paddingLeft:6}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:7}}><span style={{fontSize:20}}>{task.icon}</span><div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"flex-end"}}><span style={CH(sc.color)}>{sc.label}</span><span style={CH(PRICLR[task.priority])}>{task.priority}</span></div></div>
-                  <NameEdit id={task.id} name={data.names[task.id]} canEdit={canEdit} onSave={saveName}/>
-                  <div style={{fontSize:10,color:T.dim,marginBottom:6}}>{task.cat} · {task.ref}</div>
-                  <div style={{marginBottom:6}}><div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:T.mid,marginBottom:2}}><span>Work</span><span>{s.progress}%</span></div><div style={{height:3,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:s.progress+"%",background:s.status==="completed"?T.green:s.status==="in-progress"?T.amber:s.status==="blocked"?T.red:T.dim,borderRadius:99}}/></div></div>
-                  <div style={{background:T.bg,borderRadius:8,padding:"7px 10px"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:T.mid,marginBottom:2}}><span>💰 Payment</span><span style={{color:b.total===0?T.dim:pp>=100?T.red:T.green}}>{b.total===0?"—":pp+"%"}</span></div>
-                    <div style={{height:3,background:T.border,borderRadius:99,overflow:"hidden",marginBottom:3}}><div style={{height:"100%",width:pp+"%",background:pp>=100?T.red:T.green,borderRadius:99}}/></div>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:10}}><span style={{color:T.green}}>Paid: PKR {fmtM(b.paid)}</span><span style={{color:T.dim}}>{b.total>0?"/"+fmtM(b.total):"No budget set"}</span></div>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",marginTop:5}}>{s.updatedBy?<span style={{fontSize:10,color:T.dim}}>✏️ {s.updatedBy}</span>:<span/>}{(s.photos||[]).length>0&&<span style={{fontSize:10,color:"#38bdf8"}}>📷 {(s.photos||[]).length}</span>}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  /* ── PAYMENTS ── */
-  function Payments(){
-    const fp=payFilt==="All"?allPays:allPays.filter(p=>p.type===payFilt);
-    const fpT=fp.reduce((s,p)=>s+p.amount,0);
-    return(
-      <div style={{maxWidth:1060,margin:"0 auto",padding:16}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:10,marginBottom:16}}>
-          {[{l:"Task Budget",v:"PKR "+fmtM(totBudget),c:"#38bdf8"},{l:"Task Paid",v:"PKR "+fmtM(totPaid),c:T.green},{l:"Remaining",v:"PKR "+fmtM(totBudget-totPaid),c:T.amber},{l:"Labour Paid",v:"PKR "+fmtM(totLabour),c:"#fb923c"},{l:"Grand Total",v:"PKR "+fmtM(totPaid+totLabour),c:T.purple}].map(x=>(<div key={x.l} style={{background:T.panel,border:"1px solid "+x.c+"22",borderRadius:12,padding:"12px 14px"}}><div style={{fontSize:9,color:T.dim,letterSpacing:1,textTransform:"uppercase",marginBottom:3}}>{x.l}</div><div style={{fontSize:17,fontWeight:700,color:x.c}}>{x.v}</div></div>))}
-        </div>
-        <div style={{display:"flex",gap:6,marginBottom:14}}>{[["task","📋 Task Payments"],["labour","👷 Labour"],["material","📦 Materials"]].map(([t,l])=><button key={t} onClick={()=>setPayTab(t)} style={BS(payTab===t?"#1d4ed8":T.border,payTab===t?"#fff":T.mid,{fontSize:12})}>{l}</button>)}</div>
-
-        {payTab==="task"&&<>
-          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,overflow:"hidden",marginBottom:14}}>
-            <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border}}><span style={{fontSize:12,color:T.text,fontWeight:600}}>Per-Task Summary</span></div>
-            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 100px 50px",padding:"6px 16px",borderBottom:"1px solid "+T.border,background:T.bg}}>{["Task","Budget","Paid","Remaining","Pay%","Txns"].map(h=><div key={h} style={{fontSize:9,color:T.dim,letterSpacing:1,textTransform:"uppercase"}}>{h}</div>)}</div>
-            {TASKS.map((task,i)=>{ const s=data.tasks[task.id],b=s.budget,pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0; return(
-              <div key={task.id} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 100px 50px",padding:"9px 16px",borderBottom:i<TASKS.length-1?"1px solid "+T.bg:"none",background:i%2===0?T.bg:T.panel,alignItems:"center"}}>
-                <div style={{display:"flex",alignItems:"center",gap:7}}><span style={{fontSize:14}}>{task.icon}</span><div><div style={{fontSize:12,color:T.text}}>{data.names[task.id]}</div><span style={CH(STATUS[s.status].color)}>{STATUS[s.status].label}</span></div></div>
-                <div style={{fontSize:12,color:b.total>0?"#38bdf8":T.dim}}>{b.total>0?"PKR "+fmtM(b.total):"—"}</div>
-                <div style={{fontSize:12,color:T.green,fontWeight:600}}>PKR {fmtM(b.paid)}</div>
-                <div style={{fontSize:12,color:b.total>0?T.amber:T.dim}}>{b.total>0?"PKR "+fmtM(b.total-b.paid):"—"}</div>
-                <div style={{display:"flex",gap:5,alignItems:"center"}}><div style={{flex:1,height:4,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:pp+"%",background:pp>=100?T.red:T.green,borderRadius:99}}/></div><span style={{fontSize:10,color:T.dim}}>{b.total>0?pp+"%":"—"}</span></div>
-                <div style={{fontSize:12,color:T.dim,textAlign:"center"}}>{(b.payments||[]).length}</div>
-              </div>
-            ); })}
-          </div>
-          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,overflow:"hidden"}}>
-            <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-              <span style={{fontSize:12,color:T.text,fontWeight:600}}>All Transactions ({fp.length})</span>
-              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{["All","Payment","Advance","Retention","Labour","Material"].map(f=><button key={f} onClick={()=>setPayFilt(f)} style={BS(payFilt===f?"#1d4ed8":T.border,payFilt===f?"#fff":T.mid,{fontSize:9,padding:"3px 7px"})}>{f}</button>)}</div>
-            </div>
-            {fp.length===0&&<div style={{padding:"28px",textAlign:"center",color:T.dim,fontSize:12}}>No transactions yet.</div>}
-            {fp.map(p=>(<div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 16px",borderBottom:"1px solid "+T.bg,flexWrap:"wrap",gap:6}}>
-              <div style={{display:"flex",alignItems:"center",gap:9}}><span style={{fontSize:15}}>{p.ticon}</span><div><div style={{fontSize:12,color:T.text,fontWeight:500}}>{p.tname}</div><div style={{display:"flex",gap:5,marginTop:2}}><span style={CH("#a78bfa")}>{p.type}</span><span style={CH("#64748b")}>{p.method}</span>{p.note&&<span style={{fontSize:10,color:T.dim}}>· {p.note}</span>}</div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{p.date} · {p.by}</div></div></div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,color:T.green,fontWeight:700}}>{fmt(p.amount)}</span>{canEdit&&<button onClick={()=>delPay(p.tid,p.id)} style={BS("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
-            </div>))}
-            {fp.length>0&&<div style={{padding:"9px 16px",background:T.bg,display:"flex",justifyContent:"flex-end"}}><span style={{fontSize:12,color:T.green,fontWeight:700}}>Total: {fmt(fpT)}</span></div>}
-          </div>
-        </>}
-
-        {payTab==="labour"&&<>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>{[{l:"Total Labour",v:fmt(totLabour),c:"#fb923c"},{l:"Entries",v:(data.labour||[]).length,c:T.text},{l:"Avg/Entry",v:(data.labour||[]).length>0?fmt(Math.round(totLabour/(data.labour||[]).length)):"—",c:T.amber}].map(x=>(<div key={x.l} style={{background:T.panel,border:"1px solid #fb923c22",borderRadius:12,padding:"12px 14px"}}><div style={{fontSize:9,color:T.dim,letterSpacing:1,textTransform:"uppercase",marginBottom:3}}>{x.l}</div><div style={{fontSize:20,fontWeight:700,color:x.c}}>{x.v}</div></div>))}</div>
-          {!isOffice&&<LabourForm onAdd={addLabour}/>}
-          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,overflow:"hidden"}}>
-            <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:T.text,fontWeight:600}}>Labour History ({(data.labour||[]).length})</span><span style={{fontSize:12,color:"#fb923c",fontWeight:600}}>Total: {fmt(totLabour)}</span></div>
-            {(data.labour||[]).length===0&&<div style={{padding:"28px",textAlign:"center",color:T.dim,fontSize:12}}>No entries yet.</div>}
-            {(data.labour||[]).map((l,i)=>(<div key={l.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:i<(data.labour||[]).length-1?"1px solid "+T.bg:"none",background:i%2===0?T.bg:T.panel,flexWrap:"wrap",gap:6}}>
-              <div><div style={{fontSize:12,color:T.text,fontWeight:500}}>{l.work||"Labour"}</div><div style={{display:"flex",gap:5,marginTop:2,flexWrap:"wrap"}}>{l.worker&&<span style={CH("#fb923c")}>👷 {l.worker}</span>}<span style={CH("#64748b")}>{l.method}</span><span style={{fontSize:10,color:T.dim}}>· {l.by}</span></div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{l.date}</div></div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:14,color:"#fb923c",fontWeight:700}}>{fmt(l.amount)}</span>{canEdit&&<button onClick={()=>delLabour(l.id)} style={BS("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
-            </div>))}
-          </div>
-        </>}
-
-        {payTab==="material"&&<>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:14}}>
-            {matStock.length===0?<div style={{gridColumn:"1/-1",background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:18,textAlign:"center",color:T.dim,fontSize:12}}>No materials yet.</div>:matStock.map(m=>(<div key={m.name} style={{background:T.panel,border:"1px solid "+(m.bal<0?T.red+"44":m.bal===0?"#64748b44":"#0f766e44"),borderRadius:12,padding:"11px 13px"}}><div style={{fontSize:11,color:T.text,fontWeight:600,marginBottom:2}}>{m.name}</div><div style={{fontSize:18,fontWeight:700,color:m.bal<0?T.red:m.bal===0?T.mid:T.green}}>{m.bal}<span style={{fontSize:10,fontWeight:400}}> {m.unit}</span></div><div style={{fontSize:10,color:T.dim}}>In:{m.i} Out:{m.o}</div>{m.v>0&&<div style={{fontSize:10,color:"#38bdf8"}}>PKR {fmtM(m.v)}</div>}</div>))}
-          </div>
-          {!isOffice&&<MatForm onAdd={addMat}/>}
-          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,overflow:"hidden"}}>
-            <div style={{padding:"10px 16px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-              <span style={{fontSize:12,color:T.text,fontWeight:600}}>Material Ledger ({(data.mats||[]).length})</span>
-              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{["All","received","issued",...[...new Set((data.mats||[]).map(m=>m.name))]].filter((v,i,a)=>a.indexOf(v)===i).map(f=><button key={f} onClick={()=>setMatFilt(f)} style={BS(matFilt===f?"#1d4ed8":T.border,matFilt===f?"#fff":T.mid,{fontSize:9,padding:"3px 7px",textTransform:"capitalize"})}>{f}</button>)}</div>
-            </div>
-            {(data.mats||[]).filter(m=>matFilt==="All"||(m.type===matFilt||m.name===matFilt)).map((m,i,arr)=>(<div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid "+T.bg:"none",background:i%2===0?T.bg:T.panel,flexWrap:"wrap",gap:6}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><span>{m.type==="received"?"📥":"📤"}</span><div><div style={{fontSize:12,color:T.text,fontWeight:600}}>{m.name}</div><div style={{display:"flex",gap:5,marginTop:2,flexWrap:"wrap"}}><span style={CH(m.type==="received"?"#0f766e":"#991b1b")}>{m.type}</span><span style={CH("#64748b")}>{m.unit}</span>{m.supplier&&<span style={{fontSize:10,color:T.dim}}>🏭 {m.supplier}</span>}<span style={{fontSize:10,color:T.dim}}>· {m.by}</span></div><div style={{fontSize:10,color:T.dim,marginTop:1}}>{m.date}{m.rate>0?" · PKR "+fmtM(m.rate)+"/"+m.unit:""}</div></div></div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:15,fontWeight:700,color:m.type==="received"?T.green:T.red}}>{m.type==="received"?"+":"-"}{m.qty} {m.unit}</span>{m.type==="received"&&m.rate>0&&<span style={{fontSize:10,color:"#38bdf8"}}>PKR {fmtM(m.qty*m.rate)}</span>}{canEdit&&<button onClick={()=>delMat(m.id)} style={BS("transparent",T.red,{padding:"2px 6px",fontSize:10,border:"1px solid "+T.red+"33"})}>✕</button>}</div>
-            </div>))}
-          </div>
-        </>}
-      </div>
-    );
-  }
-
-  /* ── ANALYTICS ── */
-  function Analytics(){
-    const byS=Object.entries(STATUS).map(([k,v])=>({label:v.label,count:TASKS.filter(t=>data.tasks[t.id].status===k).length,color:v.color}));
-    const cols=["#38bdf8","#a78bfa","#22c55e","#f59e0b","#f43f5e"];
-    const byC=[...new Set(TASKS.map(t=>t.cat))].map((c,i)=>({cat:c,tasks:TASKS.filter(t=>t.cat===c),budget:TASKS.filter(t=>t.cat===c).reduce((s,t)=>s+data.tasks[t.id].budget.total,0),paid:TASKS.filter(t=>t.cat===c).reduce((s,t)=>s+data.tasks[t.id].budget.paid,0),prog:Math.round(TASKS.filter(t=>t.cat===c).reduce((s,t)=>s+data.tasks[t.id].progress,0)/TASKS.filter(t=>t.cat===c).length),color:cols[i%cols.length]}));
-    return(
-      <div style={{maxWidth:1060,margin:"0 auto",padding:16}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
-          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:16}}><div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>Tasks by Status</div>{byS.map(s=>(<div key={s.label} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}><span style={{color:s.color}}>{s.label}</span><span style={{color:T.mid}}>{s.count}</span></div><div style={{height:7,background:T.border,borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:(s.count/TASKS.length*100)+"%",background:s.color,borderRadius:99}}/></div></div>))}</div>
-          <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,padding:16}}><div style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:12}}>Budget by Category</div>{byC.map(c=>{ const pct=c.budget>0?Math.round(c.paid/c.budget*100):0; return(<div key={c.cat} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}><span style={{color:c.color}}>{c.cat} ({c.tasks.length})</span><span style={{color:T.mid}}>PKR {fmtM(c.budget)} · {pct}%</span></div><div style={{height:6,background:c.color+"33",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:pct+"%",background:c.color,borderRadius:99}}/></div></div>); })}</div>
-        </div>
-      </div>
-    );
-  }
-
-  /* ── LOG ── */
-  function Log(){
-    return(
-      <div style={{maxWidth:720,margin:"0 auto",padding:16}}>
-        <div style={{background:T.panel,border:"1px solid "+T.border,borderRadius:12,overflow:"hidden"}}>
-          <div style={{padding:"12px 18px",borderBottom:"1px solid "+T.border,display:"flex",justifyContent:"space-between"}}><span style={{fontSize:13,color:T.text,fontWeight:600}}>📜 Activity Log</span><span style={{fontSize:11,color:T.dim}}>{(data.log||[]).length} entries</span></div>
-          {(data.log||[]).length===0&&<div style={{padding:36,textAlign:"center",color:T.dim,fontSize:13}}>No activity yet.</div>}
-          {(data.log||[]).map((e,i)=>{ const u=USERS.find(u=>u.id===e.wid)||{color:T.mid,icon:"👤"}; return(<div key={e.id} style={{display:"flex",gap:10,padding:"10px 18px",borderBottom:i<(data.log||[]).length-1?"1px solid "+T.bg:"none",background:i%2===0?T.bg:T.panel}}><span style={{fontSize:14,marginTop:2}}>{u.icon}</span><div style={{flex:1}}><div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:4}}><span style={{fontSize:12,color:u.color,fontWeight:600}}>{e.who}</span><span style={{fontSize:10,color:T.dim}}>{e.time}</span></div><div style={{fontSize:12,color:T.text,marginTop:1}}><span style={{color:T.amber}}>{e.action}</span>{e.detail?" — "+e.detail:""}</div></div></div>); })}
-        </div>
-      </div>
-    );
-  }
-
-  /* ── BRIEFING ── */
-  function Briefing(){
-    return(
-      <div style={{maxWidth:680,margin:"0 auto",padding:16}}>
-        <div style={{background:T.panel,border:"1px solid #7c1d1d33",borderRadius:14,padding:24}}>
-          <div style={{fontSize:10,color:"#fb923c",letterSpacing:2,textTransform:"uppercase",marginBottom:4,fontWeight:600}}>🤖 AI Daily Briefing</div>
-          <div style={{fontSize:18,color:T.hi,fontWeight:700,marginBottom:3}}>Construction Report</div>
-          <div style={{fontSize:11,color:T.dim,marginBottom:16}}>{PROJECT.name}</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>{[{l:"Budget",v:fmt(totBudget),c:"#38bdf8"},{l:"Paid",v:fmt(totPaid),c:T.green},{l:"Labour",v:fmt(totLabour),c:"#fb923c"},{l:"Progress",v:totProg+"%",c:T.purple}].map(x=>(<div key={x.l} style={{background:T.bg,borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:T.dim,marginBottom:2,textTransform:"uppercase"}}>{x.l}</div><div style={{fontSize:16,fontWeight:700,color:x.c}}>{x.v}</div></div>))}</div>
-          {briefLd?<div style={{textAlign:"center",padding:"24px 0",color:T.dim}}><div style={{fontSize:32,marginBottom:8}}>🏗️</div><div>Analyzing…</div></div>:<div style={{fontSize:13,color:T.text,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{brief||"Click 'AI' in nav to generate report."}</div>}
-        </div>
-      </div>
-    );
-  }
-
-  /* ── RENDER ── */
-  return(
-    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"'Segoe UI',Arial,sans-serif"}}>
-      <Nav/>
-      {page==="dashboard"&&<Dashboard/>}
-      {page==="task"&&activeTask&&<TaskPage key={tid} task={activeTask} name={data.names[tid]} td={data.tasks[tid]} perm={user.perm} canEdit={canEdit} onSave={d=>saveTask(tid,d)} onBack={()=>setPage("dashboard")} onAddPay={p=>addPay(tid,p)} onDelPay={pid=>delPay(tid,pid)} onAddPhoto={p=>addPhoto(tid,p)} onDelPhoto={pid=>delPhoto(tid,pid)}/>}
-      {page==="payments"&&<Payments/>}
-      {page==="analytics"&&<Analytics/>}
-      {page==="log"&&<Log/>}
-      {page==="briefing"&&<Briefing/>}
-    </div>
-  );
+  showPick();
+  root.appendChild(box);
+  return root;
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+// ─── NAV ──────────────────────────────────────────────────────────────────────
+function renderNav(){
+  const canEdit=USER.perm==="all", isOffice=USER.perm==="payments_only";
+  const totB=Object.values(DATA.tasks).reduce((s,t)=>s+(t.budget.total||0),0);
+  const totP=Object.values(DATA.tasks).reduce((s,t)=>s+(t.budget.paid||0),0);
+  const totL=(DATA.labour||[]).reduce((s,l)=>s+l.amount,0);
+  const totPr=Math.round(Object.values(DATA.tasks).reduce((s,t)=>s+t.progress,0)/TASKS.length);
+  const cnts={done:0,active:0,blocked:0};
+  Object.values(DATA.tasks).forEach(t=>{ if(t.status==="completed")cnts.done++; else if(t.status==="in-progress")cnts.active++; else if(t.status==="blocked")cnts.blocked++; });
+
+  const nav=div({background:"#0d1117",borderBottom:"1px solid #1a2030",padding:"12px 20px",position:"sticky",top:"0",zIndex:"100"});
+  const inner=div({maxWidth:"1060px",margin:"0 auto"});
+
+  // top row
+  const top=div({display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"10px"});
+  const info=div({});
+  info.innerHTML=`<div style="font-size:9px;letter-spacing:3px;color:#334155;text-transform:uppercase">${PROJECT.firm} · ${PROJECT.architect}</div><div style="font-size:16px;color:#f1f5f9;font-weight:700;margin:3px 0 1px">🏡 ${PROJECT.name}</div><div style="font-size:11px;color:#334155">${PROJECT.client} · ${PROJECT.plotSize} · ${PROJECT.totalArea}</div>`;
+  top.appendChild(info);
+
+  const btns=div({display:"flex",gap:"6px",flexWrap:"wrap",alignItems:"center"});
+  const pages=[["dashboard","📋 Tasks"],["payments","💳 Payments"],["analytics","📈 Analytics"],["log","📜 Activity"],["briefing","🤖 AI"]].filter(([p])=>isOffice?p==="payments":true);
+  pages.forEach(([p,l])=>{
+    const b=btn(l,PAGE===p?"#1d4ed8":"#1a2030",PAGE===p?"#fff":"#475569",()=>{ PAGE=p; render(); },{fontSize:"11px"});
+    btns.appendChild(b);
+  });
+
+  // refresh btn
+  const rfBtn=btn("🔄","#1a2030","#475569",async()=>{
+    const saved=await dbLoad(); DATA=mergeData(saved); render();
+  },{fontSize:"11px",padding:"8px 10px"});
+  btns.appendChild(rfBtn);
+
+  // user badge
+  const badge=div({display:"flex",alignItems:"center",gap:"6px",background:"#07090f",border:`1px solid ${USER.color}44`,borderRadius:"8px",padding:"5px 10px"});
+  badge.innerHTML=`<span style="font-size:14px">${USER.icon}</span><div><div style="font-size:12px;color:${USER.color};font-weight:600">${USER.name}</div><div style="font-size:10px;color:#334155">${USER.role}</div></div>`;
+  const logoutBtn=btn("⏏","transparent","#334155",()=>{ USER=null; PAGE="dashboard"; render(); },{fontSize:"10px",padding:"2px 6px"});
+  badge.appendChild(logoutBtn);
+  btns.appendChild(badge);
+
+  const saveMsg=el("span",{id:"save-msg",style:{fontSize:"10px",fontWeight:"600"}});
+  btns.appendChild(saveMsg);
+  top.appendChild(btns);
+  inner.appendChild(top);
+
+  // stats row
+  const stats=div({marginTop:"10px",display:"flex",gap:"16px",flexWrap:"wrap",alignItems:"center"});
+  [{v:totPr+"%",l:"Progress",c:"#7c3aed"},{v:cnts.active,l:"Active",c:"#f59e0b"},{v:cnts.done+"/"+TASKS.length,l:"Done",c:"#22c55e"},{v:cnts.blocked,l:"Blocked",c:"#f43f5e"},{v:"PKR "+fmtM(totP),l:"Task Paid",c:"#22c55e"},{v:"PKR "+fmtM(totL),l:"Labour",c:"#fb923c"},{v:"PKR "+fmtM(totB-totP),l:"Remaining",c:"#f59e0b"}].forEach(s=>{
+    const d=div({textAlign:"center"});
+    d.innerHTML=`<div style="font-size:14px;font-weight:700;color:${s.c};line-height:1">${s.v}</div><div style="font-size:9px;color:#334155;letter-spacing:1px;text-transform:uppercase">${s.l}</div>`;
+    stats.appendChild(d);
+  });
+  const barWrap=div({flex:"1",minWidth:"80px"});
+  const barBg=div({height:"4px",background:"#1a2030",borderRadius:"99px",overflow:"hidden"});
+  const barFill=div({height:"100%",width:totPr+"%",background:"linear-gradient(90deg,#7c3aed,#22c55e)",borderRadius:"99px"});
+  barBg.appendChild(barFill); barWrap.appendChild(barBg); stats.appendChild(barWrap);
+  inner.appendChild(stats);
+  nav.appendChild(inner);
+  return nav;
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function renderDashboard(){
+  const canEdit=USER.perm==="all", isOffice=USER.perm==="payments_only";
+  const root=div({});
+
+  // filters
+  const fBar=div({background:"#0d1117",border:"1px solid #1a2030",borderRadius:"12px",padding:"12px 14px",marginBottom:"14px"});
+  const fRow=div({display:"flex",gap:"8px",flexWrap:"wrap",alignItems:"center"});
+  const srchInp=inp("🔍 Search…","text",FILTER.srch);
+  srchInp.style.width="150px"; srchInp.style.fontSize="12px";
+  srchInp.oninput=e=>{ FILTER.srch=e.target.value; refreshCards(); };
+  fRow.appendChild(srchInp);
+
+  const floors=["All","Basement","Ground Floor","First Floor","Roof/Quarters","Ground Level"];
+  const flRow=div({display:"flex",gap:"4px",flexWrap:"wrap"});
+  floors.forEach(f=>{ const b=btn(f,FILTER.fl===f?"#1e3a5f":"#1a2030",FILTER.fl===f?"#93c5fd":"#475569",()=>{ FILTER.fl=f; refreshCards(); },{fontSize:"10px"}); flRow.appendChild(b); });
+  fRow.appendChild(flRow);
+
+  const cats=["All",...new Set(TASKS.map(t=>t.cat))];
+  const catRow=div({display:"flex",gap:"4px",flexWrap:"wrap"});
+  cats.forEach(c=>{ const b=btn(c,FILTER.cat===c?"#14532d":"#1a2030",FILTER.cat===c?"#86efac":"#475569",()=>{ FILTER.cat=c; refreshCards(); },{fontSize:"10px"}); catRow.appendChild(b); });
+  fRow.appendChild(catRow);
+
+  const stRow=div({display:"flex",gap:"4px",flexWrap:"wrap"});
+  [["All","All","#1a2030","#475569"],["not-started","Not Started","#64748b33","#64748b"],["in-progress","In Progress","#f59e0b33","#f59e0b"],["completed","Completed","#22c55e33","#22c55e"],["blocked","Blocked","#f43f5e33","#f43f5e"]].forEach(([v,l,bg,fg])=>{
+    const active=FILTER.st===v;
+    const b=btn(l,active?bg:"#1a2030",active?fg:"#475569",()=>{ FILTER.st=v; refreshCards(); },{fontSize:"10px"});
+    stRow.appendChild(b);
+  });
+  fRow.appendChild(stRow);
+  fBar.appendChild(fRow);
+  root.appendChild(fBar);
+
+  const grid=div({display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:"12px"});
+  root.appendChild(grid);
+
+  function refreshCards(){
+    grid.innerHTML="";
+    const vis=TASKS.filter(t=>{
+      if(FILTER.fl!=="All"&&!t.floors.includes(FILTER.fl)) return false;
+      if(FILTER.cat!=="All"&&t.cat!==FILTER.cat) return false;
+      if(FILTER.st!=="All"&&DATA.tasks[t.id].status!==FILTER.st) return false;
+      if(FILTER.srch&&!(DATA.names[t.id]||"").toLowerCase().includes(FILTER.srch.toLowerCase())) return false;
+      return true;
+    });
+    vis.forEach(task=>{
+      const s=DATA.tasks[task.id], sc=STATUS[s.status], b=s.budget;
+      const pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0;
+      const borderColor=s.status==="completed"?"#22c55e33":s.status==="in-progress"?"#f59e0b33":s.status==="blocked"?"#f43f5e33":"#1a2030";
+      const card=div({background:"#0d1117",border:`1px solid ${borderColor}`,borderRadius:"13px",padding:"14px",cursor:isOffice?"default":"pointer",position:"relative",overflow:"hidden",transition:"all .15s"});
+      if(!isOffice){
+        card.onmouseenter=()=>{ card.style.transform="translateY(-2px)"; card.style.boxShadow="0 8px 28px #00000055"; };
+        card.onmouseleave=()=>{ card.style.transform="none"; card.style.boxShadow="none"; };
+        card.onclick=()=>{ TASK_ID=task.id; PAGE="task"; render(); };
+      }
+      // priority stripe
+      const stripe=div({position:"absolute",top:"0",left:"0",width:"3px",height:"100%",background:PRICLR[task.priority],borderRadius:"13px 0 0 13px"});
+      card.appendChild(stripe);
+      const inner=div({paddingLeft:"6px"});
+      // header row
+      const hrow=div({display:"flex",justifyContent:"space-between",marginBottom:"7px"});
+      hrow.appendChild(span({fontSize:"20px"},task.icon));
+      const chips=div({display:"flex",flexDirection:"column",gap:"3px",alignItems:"flex-end"});
+      chips.appendChild(chip(sc.label,sc.color));
+      chips.appendChild(chip(task.priority,PRICLR[task.priority]));
+      hrow.appendChild(chips);
+      inner.appendChild(hrow);
+      // name
+      const nameRow=div({fontWeight:"700",fontSize:"13px",color:"#f1f5f9",marginBottom:"2px",display:"flex",alignItems:"center",gap:"5px"});
+      nameRow.appendChild(span({},DATA.names[task.id]));
+      if(canEdit){
+        const editIcon=span({fontSize:"9px",color:"#334155",cursor:"pointer",opacity:".5"},"✏️");
+        editIcon.onclick=ev=>{ ev.stopPropagation(); const nn=prompt("Rename module:",DATA.names[task.id]); if(nn&&nn.trim()){ DATA.names[task.id]=nn.trim(); addLog("Renamed","→ "+nn.trim()); render(); } };
+        nameRow.appendChild(editIcon);
+      }
+      inner.appendChild(nameRow);
+      inner.appendChild(span({fontSize:"10px",color:"#334155",display:"block",marginBottom:"6px"},task.cat+" · "+task.ref));
+      // progress bar
+      const pWrap=div({marginBottom:"6px"});
+      const pLbl=div({display:"flex",justifyContent:"space-between",fontSize:"10px",color:"#475569",marginBottom:"2px"});
+      pLbl.appendChild(span({},"Work")); pLbl.appendChild(span({},s.progress+"%"));
+      pWrap.appendChild(pLbl);
+      const pBg=div({height:"3px",background:"#1a2030",borderRadius:"99px",overflow:"hidden"});
+      const barC=s.status==="completed"?"#22c55e":s.status==="in-progress"?"#f59e0b":s.status==="blocked"?"#f43f5e":"#334155";
+      const pFill=div({height:"100%",width:s.progress+"%",background:barC,borderRadius:"99px"});
+      pBg.appendChild(pFill); pWrap.appendChild(pBg); inner.appendChild(pWrap);
+      // payment mini
+      const pmini=div({background:"#07090f",borderRadius:"8px",padding:"7px 10px"});
+      const plbl=div({display:"flex",justifyContent:"space-between",fontSize:"10px",color:"#475569",marginBottom:"2px"});
+      plbl.appendChild(span({},"💰 Payment")); plbl.appendChild(span({color:b.total===0?"#334155":pp>=100?"#f43f5e":"#22c55e"},b.total===0?"—":pp+"%"));
+      pmini.appendChild(plbl);
+      const pbg=div({height:"3px",background:"#1a2030",borderRadius:"99px",overflow:"hidden",marginBottom:"3px"});
+      const pf=div({height:"100%",width:pp+"%",background:pp>=100?"#f43f5e":"#22c55e",borderRadius:"99px"});
+      pbg.appendChild(pf); pmini.appendChild(pbg);
+      const pamt=div({display:"flex",justifyContent:"space-between",fontSize:"10px"});
+      pamt.appendChild(span({color:"#22c55e"},"Paid: PKR "+fmtM(b.paid)));
+      pamt.appendChild(span({color:"#334155"},b.total>0?"/"+fmtM(b.total):"No budget set"));
+      pmini.appendChild(pamt);
+      inner.appendChild(pmini);
+      const foot=div({display:"flex",justifyContent:"space-between",marginTop:"5px"});
+      foot.appendChild(s.updatedBy?span({fontSize:"10px",color:"#334155"},"✏️ "+s.updatedBy):span({},""));
+      if((s.photos||[]).length>0) foot.appendChild(span({fontSize:"10px",color:"#38bdf8"},"📷 "+(s.photos||[]).length));
+      inner.appendChild(foot);
+      card.appendChild(inner);
+      grid.appendChild(card);
+    });
+  }
+  refreshCards();
+  return root;
+}
+
+// ─── TASK PAGE ────────────────────────────────────────────────────────────────
+function renderTaskPage(){
+  const task=TASKS.find(t=>t.id===TASK_ID);
+  if(!task) return div({},[]);
+  const s=DATA.tasks[task.id], b=s.budget;
+  const canEdit=USER.perm==="all", canAdd=USER.perm!=="payments_only";
+  const pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0;
+  const root=div({maxWidth:"720px",margin:"0 auto"});
+  const box=div({background:"#0d1117",border:"1px solid #1a2030",borderRadius:"14px",padding:"20px"});
+
+  // header
+  const hdr=div({display:"flex",gap:"12px",marginBottom:"14px",paddingBottom:"12px",borderBottom:"1px solid #1a2030"});
+  hdr.appendChild(span({fontSize:"32px"},task.icon));
+  const hinfo=div({flex:"1"});
+  hinfo.appendChild(el("div",{style:{fontSize:"17px",color:"#f1f5f9",fontWeight:"700",marginBottom:"2px"}},[DATA.names[task.id]]));
+  hinfo.appendChild(el("div",{style:{fontSize:"11px",color:"#334155",marginBottom:"5px"}},[task.cat+" · "+task.ref]));
+  const flChips=div({display:"flex",gap:"4px",flexWrap:"wrap"});
+  task.floors.forEach(f=>flChips.appendChild(chip(f,"#38bdf8")));
+  flChips.appendChild(chip(task.priority,PRICLR[task.priority]));
+  if(s.updatedBy) flChips.appendChild(span({fontSize:"10px",color:"#334155",marginLeft:"4px"},"· "+s.updatedBy));
+  hinfo.appendChild(flChips);
+  hdr.appendChild(hinfo);
+  box.appendChild(hdr);
+
+  // specs
+  const specs=div({background:"#07090f",border:"1px solid #1a2030",borderRadius:"10px",padding:"10px 14px",marginBottom:"14px"});
+  specs.appendChild(el("div",{style:{fontSize:"10px",color:"#475569",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"6px",fontWeight:"600"}},["Specifications"]));
+  task.details.forEach(d=>{ const r=el("div",{style:{fontSize:"12px",color:"#334155",lineHeight:"1.7"}}); r.textContent="• "+d; specs.appendChild(r); });
+  specs.appendChild(el("div",{style:{marginTop:"7px",paddingTop:"7px",borderTop:"1px solid #1a2030",fontSize:"11px",color:"#334155"}},["📐 "+task.scope]));
+  box.appendChild(specs);
+
+  // status + progress
+  const sp=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"14px"});
+
+  // status col
+  const stCol=div({});
+  stCol.appendChild(el("div",{style:{fontSize:"10px",color:"#475569",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"6px",fontWeight:"600"}},["Status"]));
+  let currentStatus=s.status;
+  const stBtns={};
+  Object.entries(STATUS).forEach(([k,v])=>{
+    const b2=el("button",{style:{background:currentStatus===k?v.color+"22":"transparent",color:currentStatus===k?v.color:"#475569",border:`1px solid ${currentStatus===k?v.color:"#1a2030"}`,borderRadius:"8px",fontSize:"12px",display:"block",width:"100%",textAlign:"left",marginBottom:"4px",padding:"7px 10px",cursor:canEdit?"pointer":"default",opacity:canEdit?"1":".65",fontFamily:"inherit",fontWeight:"500"}});
+    b2.textContent=v.label;
+    if(canEdit) b2.onclick=()=>{
+      currentStatus=k;
+      Object.entries(stBtns).forEach(([kk,bb])=>{ bb.style.background=kk===k?STATUS[kk].color+"22":"transparent"; bb.style.color=kk===k?STATUS[kk].color:"#475569"; bb.style.borderColor=kk===k?STATUS[kk].color:"#1a2030"; });
+    };
+    stBtns[k]=b2; stCol.appendChild(b2);
+  });
+  sp.appendChild(stCol);
+
+  // progress col
+  const prCol=div({});
+  let currentProg=s.progress;
+  const prLbl=el("div",{style:{fontSize:"10px",color:"#475569",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"6px",fontWeight:"600"}},["Progress — "+currentProg+"%"]);
+  prCol.appendChild(prLbl);
+  const prBg=div({height:"6px",background:"#1a2030",borderRadius:"99px",overflow:"hidden",marginBottom:"8px"});
+  const prFill=div({height:"100%",width:currentProg+"%",background:"#f59e0b",borderRadius:"99px"});
+  prBg.appendChild(prFill); prCol.appendChild(prBg);
+  const prRange=el("input",{type:"range",min:"0",max:"100",style:{marginBottom:"12px",accentColor:"#f59e0b",opacity:canEdit?"1":".5"}});
+  prRange.value=currentProg; prRange.disabled=!canEdit;
+  prRange.oninput=e=>{ currentProg=+e.target.value; prFill.style.width=currentProg+"%"; prLbl.textContent="Progress — "+currentProg+"%"; };
+  prCol.appendChild(prRange);
+  prCol.appendChild(el("div",{style:{fontSize:"10px",color:"#475569",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"6px",fontWeight:"600"}},["Site Notes"]));
+  const notesTA=el("textarea",{rows:"4",placeholder:canEdit?"Issues, observations…":"View only — Omer can edit",style:{opacity:canEdit?"1":".7"}});
+  notesTA.value=s.notes||""; notesTA.readOnly=!canEdit; prCol.appendChild(notesTA);
+  sp.appendChild(prCol);
+  box.appendChild(sp);
+
+  // contractor
+  const ctBox=div({background:"#07090f",border:"1px solid #1a2030",borderRadius:"10px",padding:"12px 14px",marginBottom:"14px"});
+  ctBox.appendChild(el("div",{style:{fontSize:"10px",color:"#475569",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px",fontWeight:"600"}},["👷 Contractor / Vendor"]));
+  const ctRow=div({display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px"});
+  const cnInp=inp("Name","text",s.contractor.name||""); cnInp.readOnly=!canEdit; cnInp.style.opacity=canEdit?"1":".7";
+  const cpInp=inp("Phone","text",s.contractor.phone||""); cpInp.readOnly=!canEdit; cpInp.style.opacity=canEdit?"1":".7";
+  const ccInp=inp("Company","text",s.contractor.co||""); ccInp.readOnly=!canEdit; ccInp.style.opacity=canEdit?"1":".7";
+  ctRow.appendChild(cnInp); ctRow.appendChild(cpInp); ctRow.appendChild(ccInp);
+  ctBox.appendChild(ctRow);
+  box.appendChild(ctBox);
+
+  // payments box
+  const payBox=div({background:"#07090f",border:"1px solid #14532d66",borderRadius:"12px",padding:"16px",marginBottom:"14px"});
+  payBox.appendChild(el("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:"10px"}},[
+    el("div",{style:{fontSize:"13px",color:"#86efac",fontWeight:"700"}},["💳 PAYMENTS"]),
+    el("div",{style:{fontSize:"11px",color:"#475569"}},[(b.payments||[]).length+" txns"])
+  ]));
+  // kpis
+  const kpis=div({display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"8px",marginBottom:b.total>0?"10px":"14px"});
+  [{l:"Budget",v:b.total>0?fmt(b.total):"Not set",c:"#38bdf8"},{l:"Paid",v:fmt(b.paid),c:"#22c55e"},{l:"Remaining",v:b.total>0?fmt(b.total-b.paid):"—",c:"#f59e0b"},{l:"% Paid",v:b.total>0?pp+"%":"—",c:pp>=100?"#f43f5e":"#22c55e"}].forEach(x=>{
+    const k=div({background:"#0d1117",borderRadius:"8px",padding:"8px 10px",textAlign:"center",border:"1px solid #1a2030"});
+    k.innerHTML=`<div style="font-size:9px;color:#334155;text-transform:uppercase;margin-bottom:2px">${x.l}</div><div style="font-size:12px;font-weight:700;color:${x.c}">${x.v}</div>`;
+    kpis.appendChild(k);
+  });
+  payBox.appendChild(kpis);
+  if(b.total>0){
+    const pb=div({height:"7px",background:"#1a2030",borderRadius:"99px",overflow:"hidden",marginBottom:"14px"});
+    pb.appendChild(div({height:"100%",width:pp+"%",background:pp>=100?"#ef4444":"#22c55e",borderRadius:"99px"}));
+    payBox.appendChild(pb);
+  }
+  // budget input
+  let newBudget=b.total||"";
+  if(canEdit){
+    payBox.appendChild(el("div",{style:{fontSize:"10px",color:"#475569",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"6px",fontWeight:"600"}},["Budget Estimate (PKR)"]));
+    const bgInp=inp("Enter total budget…","number",newBudget);
+    bgInp.style.marginBottom="12px";
+    bgInp.oninput=e=>newBudget=e.target.value;
+    payBox.appendChild(bgInp);
+  }
+  // add payment form
+  if(canAdd){
+    const pSep=div({borderTop:"1px solid #1a2030",paddingTop:"12px",marginBottom:"12px"});
+    pSep.appendChild(el("div",{style:{fontSize:"10px",color:"#475569",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px",fontWeight:"600"}},["Record Payment"]));
+    const pr1=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"8px"});
+    const paInp=inp("Amount (PKR) *","number"); paInp.style.color="#22c55e"; paInp.style.fontWeight="600";
+    const pdInp=inp("","date",todayStr());
+    pr1.appendChild(paInp); pr1.appendChild(pdInp); pSep.appendChild(pr1);
+    const pr2=div({display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"10px"});
+    const pmSel=el("select"); METHODS.forEach(m=>{ const o=el("option"); o.value=o.textContent=m; pmSel.appendChild(o); });
+    const ptSel=el("select"); ["Payment","Advance","Retention","Labour","Material"].forEach(t=>{ const o=el("option"); o.value=o.textContent=t; ptSel.appendChild(o); });
+    const pnInp=inp("Note…");
+    pr2.appendChild(pmSel); pr2.appendChild(ptSel); pr2.appendChild(pnInp); pSep.appendChild(pr2);
+    const addPayBtn=btn("+ Record Payment","#14532d","#86efac",()=>{
+      const amt=Number(paInp.value); if(!amt||amt<=0) return;
+      const p={id:Date.now(),amount:amt,date:pdInp.value,method:pmSel.value,note:pnInp.value,type:ptSel.value,by:USER.name,at:nowStr()};
+      const pays=[p,...(b.payments||[])];
+      DATA.tasks[task.id].budget.payments=pays;
+      DATA.tasks[task.id].budget.paid=pays.reduce((s,x)=>s+x.amount,0);
+      addLog("Payment","PKR"+fmtM(amt)+" "+DATA.names[task.id]);
+      TASK_ID=task.id; PAGE="task"; render();
+    },{width:"100%",padding:"9px"});
+    pSep.appendChild(addPayBtn);
+    payBox.appendChild(pSep);
+  }
+  // payment list
+  if((b.payments||[]).length>0){
+    const pList=div({maxHeight:"180px",overflowY:"auto"});
+    (b.payments||[]).forEach(p=>{
+      const pr=div({display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"#0d1117",borderRadius:"8px",marginBottom:"4px",border:"1px solid #1a2030"});
+      const pl=div({});
+      const pc=div({display:"flex",gap:"5px"}); pc.appendChild(chip(p.type,"#a78bfa")); pc.appendChild(chip(p.method,"#64748b")); pl.appendChild(pc);
+      const pm=el("div",{style:{fontSize:"10px",color:"#334155",marginTop:"2px"}}); pm.textContent=p.date+" · "+p.by+(p.note?" · "+p.note:""); pl.appendChild(pm);
+      pr.appendChild(pl);
+      const rr=div({display:"flex",alignItems:"center",gap:"8px"});
+      rr.appendChild(span({fontSize:"13px",color:"#22c55e",fontWeight:"700"},fmt(p.amount)));
+      if(canEdit){ const db=btn("✕","transparent","#f43f5e",()=>{ DATA.tasks[task.id].budget.payments=b.payments.filter(x=>x.id!==p.id); DATA.tasks[task.id].budget.paid=DATA.tasks[task.id].budget.payments.reduce((s,x)=>s+x.amount,0); PAGE="task"; render(); },{padding:"2px 6px",fontSize:"10px",border:"1px solid #f43f5e33"}); rr.appendChild(db); }
+      pr.appendChild(rr); pList.appendChild(pr);
+    });
+    payBox.appendChild(pList);
+  }
+  box.appendChild(payBox);
+
+  // photos
+  const phBox=div({background:"#07090f",border:"1px solid #1e3a5f",borderRadius:"12px",padding:"16px",marginBottom:"14px"});
+  const phHdr=div({display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"});
+  phHdr.appendChild(span({fontSize:"13px",color:"#93c5fd",fontWeight:"700"},"📷 SITE PHOTOS"));
+  phHdr.appendChild(span({fontSize:"11px",color:"#475569"},(s.photos||[]).length+" photos"));
+  phBox.appendChild(phHdr);
+  if(canAdd){
+    const phRow=div({display:"flex",gap:"8px",marginBottom:"12px"});
+    const capInp=inp("Caption (optional)…"); capInp.style.flex="1";
+    const fileInp=el("input",{type:"file",accept:"image/*",style:{display:"none"}});
+    const upBtn=btn("📁 Upload","#1e3a8a","#93c5fd",()=>fileInp.click(),{whiteSpace:"nowrap"});
+    fileInp.onchange=e=>{ const f=e.target.files?.[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{ const photo={id:Date.now(),data:ev.target.result,caption:capInp.value||f.name,size:Math.round(f.size/1024)+"KB",by:USER.name,at:nowStr()}; if(!DATA.tasks[task.id].photos) DATA.tasks[task.id].photos=[]; DATA.tasks[task.id].photos.unshift(photo); addLog("Photo Added",DATA.names[task.id]); PAGE="task"; render(); }; r.readAsDataURL(f); };
+    phRow.appendChild(capInp); phRow.appendChild(upBtn); phRow.appendChild(fileInp); phBox.appendChild(phRow);
+  }
+  if((s.photos||[]).length===0){ phBox.appendChild(el("div",{style:{textAlign:"center",padding:"14px 0",color:"#334155",fontSize:"12px"}},["No photos yet."])); }
+  else{
+    const phGrid=div({display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:"8px"});
+    (s.photos||[]).forEach(p=>{
+      const pc=div({position:"relative",borderRadius:"8px",overflow:"hidden",border:"1px solid #1a2030",cursor:"pointer"});
+      const img=el("img",{src:p.data,alt:p.caption,style:{width:"100%",height:"90px",objectFit:"cover",display:"block"}});
+      img.onclick=()=>{ const lb=div({position:"fixed",inset:"0",background:"#000c",zIndex:"999",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}); lb.onclick=()=>document.body.removeChild(lb); const inner=div({background:"#0d1117",borderRadius:"12px",overflow:"hidden",maxWidth:"700px",width:"100%"}); inner.onclick=e=>e.stopPropagation(); const im=el("img",{src:p.data,style:{width:"100%",maxHeight:"70vh",objectFit:"contain",display:"block"}}); inner.appendChild(im); const cap=div({padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}); cap.innerHTML=`<div><div style="font-size:13px;color:#f1f5f9">${p.caption}</div><div style="font-size:10px;color:#334155;margin-top:2px">${p.by} · ${p.size}</div></div>`; const cb=btn("✕ Close","#1a2030","#475569",()=>document.body.removeChild(lb),{fontSize:"11px"}); cap.appendChild(cb); inner.appendChild(cap); lb.appendChild(inner); document.body.appendChild(lb); };
+      pc.appendChild(img);
+      const info=div({padding:"5px 7px",background:"#0d1117"}); info.innerHTML=`<div style="font-size:9px;color:#cbd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.caption}</div><div style="font-size:8px;color:#334155">${p.by} · ${p.size}</div>`;
+      pc.appendChild(info);
+      if(canEdit){ const db=btn("✕","#000b","#fff",e=>{ e.stopPropagation(); DATA.tasks[task.id].photos=(s.photos||[]).filter(x=>x.id!==p.id); addLog("Photo Deleted",DATA.names[task.id]); PAGE="task"; render(); },{position:"absolute",top:"4px",right:"4px",padding:"0",width:"20px",height:"20px",fontSize:"10px",borderRadius:"99px",border:"none"}); pc.appendChild(db); }
+      phGrid.appendChild(pc);
+    });
+    phBox.appendChild(phGrid);
+  }
+  box.appendChild(phBox);
+
+  // action buttons
+  const actRow=div({display:"flex",gap:"8px",marginBottom:"14px",flexWrap:"wrap"});
+  if(canEdit){
+    actRow.appendChild(btn("💾 Save Changes","#1d4ed8","#fff",()=>{
+      DATA.tasks[task.id].status=currentStatus;
+      DATA.tasks[task.id].progress=currentProg;
+      DATA.tasks[task.id].notes=notesTA.value;
+      DATA.tasks[task.id].budget.total=Number(newBudget)||0;
+      DATA.tasks[task.id].contractor={name:cnInp.value,phone:cpInp.value,co:ccInp.value};
+      DATA.tasks[task.id].updatedBy=USER.name;
+      DATA.tasks[task.id].updatedAt=nowStr();
+      DATA.tasks[task.id].history=[{time:nowStr(),who:USER.name,status:currentStatus,prog:currentProg,note:notesTA.value},...(DATA.tasks[task.id].history||[]).slice(0,19)];
+      addLog("Task Updated",DATA.names[task.id]+" → "+currentStatus+" "+currentProg+"%");
+      PAGE="dashboard"; render();
+    }));
+  } else {
+    actRow.appendChild(el("div",{style:{fontSize:"12px",color:"#334155",padding:"8px 12px",background:"#07090f",borderRadius:"8px",border:"1px solid #1a2030"}},["🔒 View only — Omer can edit"]));
+  }
+  // AI button
+  const aiBox=div({background:"#0a0d14",border:"1px solid #7c1d1d44",borderRadius:"10px",padding:"14px",marginBottom:"14px",display:"none"});
+  aiBox.appendChild(el("div",{style:{fontSize:"10px",color:"#fb923c",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"6px",fontWeight:"600"}},["🤖 AI Advisor"]));
+  const aiContent=el("div",{style:{fontSize:"13px",color:"#cbd5e1",lineHeight:"1.85",whiteSpace:"pre-wrap"}},[""]);
+  aiBox.appendChild(aiContent);
+  const aiBtn=btn("🤖 AI Advisor","#7c1d1d","#fca5a5",async()=>{
+    aiBox.style.display="block"; aiContent.textContent="Analyzing…"; aiBtn.textContent="Analyzing…"; aiBtn.disabled=true;
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:900,system:"Senior construction PM Lahore. Concise bullets.",messages:[{role:"user",content:"Task:"+DATA.names[task.id]+" ["+task.priority+"] "+task.ref+"\nStatus:"+s.status+" "+s.progress+"%\nBudget:PKR"+fmtM(b.total)+" Paid:PKR"+fmtM(b.paid)+"\n\n1.⚡ Actions 2.🔍 Checks 3.💰 Budget 4.⏱ Timeline 5.🔗 Dependencies"}]})});
+      const d=await r.json(); aiContent.textContent=d.error?"⚠️ "+d.error.message:d.content?.map(c=>c.text||"").join("")||"No response.";
+    }catch(e){ aiContent.textContent="⚠️ "+e.message; }
+    aiBtn.textContent="🤖 AI Advisor"; aiBtn.disabled=false;
+  });
+  actRow.appendChild(aiBtn);
+  actRow.appendChild(btn("← Back","#1a2030","#475569",()=>{ PAGE="dashboard"; render(); }));
+  box.appendChild(actRow);
+  box.appendChild(aiBox);
+
+  // history
+  if((s.history||[]).length>0){
+    box.appendChild(el("div",{style:{fontSize:"10px",color:"#475569",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"6px",fontWeight:"600"}},["Update History"]));
+    const hl=div({maxHeight:"160px",overflowY:"auto"});
+    (s.history||[]).forEach(h=>{
+      const hr=div({borderLeft:"2px solid #1a2030",paddingLeft:"10px",marginBottom:"7px"});
+      const u=USERS.find(x=>x.name===h.who);
+      hr.innerHTML=`<div style="font-size:10px;color:#334155">${h.time} · <span style="color:${u?.color||"#475569"}">${h.who}</span> · <span style="color:${STATUS[h.status]?.color||"#475569"}">${STATUS[h.status]?.label||h.status}</span> · ${h.prog}%</div>${h.note?`<div style="font-size:11px;color:#1e3a5f;margin-top:1px">${h.note}</div>`:""}`;
+      hl.appendChild(hr);
+    });
+    box.appendChild(hl);
+  }
+  root.appendChild(box);
+  return root;
+}
+
+// ─── PAYMENTS ────────────────────────────────────────────────────────────────
+function renderPayments(){
+  const canEdit=USER.perm==="all", isOffice=USER.perm==="payments_only";
+  const totB=Object.values(DATA.tasks).reduce((s,t)=>s+(t.budget.total||0),0);
+  const totP=Object.values(DATA.tasks).reduce((s,t)=>s+(t.budget.paid||0),0);
+  const totL=(DATA.labour||[]).reduce((s,l)=>s+l.amount,0);
+  const root=div({});
+
+  // KPI cards
+  const kpiRow=div({display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:"10px",marginBottom:"16px"});
+  [{l:"Task Budget",v:"PKR "+fmtM(totB),c:"#38bdf8"},{l:"Task Paid",v:"PKR "+fmtM(totP),c:"#22c55e"},{l:"Remaining",v:"PKR "+fmtM(totB-totP),c:"#f59e0b"},{l:"Labour Paid",v:"PKR "+fmtM(totL),c:"#fb923c"},{l:"Grand Total",v:"PKR "+fmtM(totP+totL),c:"#a78bfa"}].forEach(x=>{
+    const k=div({background:"#0d1117",border:`1px solid ${x.c}22`,borderRadius:"12px",padding:"12px 14px"});
+    k.innerHTML=`<div style="font-size:9px;color:#334155;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">${x.l}</div><div style="font-size:17px;font-weight:700;color:${x.c}">${x.v}</div>`;
+    kpiRow.appendChild(k);
+  });
+  root.appendChild(kpiRow);
+
+  // tab buttons
+  const tabs=div({display:"flex",gap:"6px",marginBottom:"14px"});
+  [["task","📋 Task Payments"],["labour","👷 Labour"],["material","📦 Materials"]].forEach(([t,l])=>{
+    tabs.appendChild(btn(l,PAY_TAB===t?"#1d4ed8":"#1a2030",PAY_TAB===t?"#fff":"#475569",()=>{ PAY_TAB=t; render(); },{fontSize:"12px"}));
+  });
+  root.appendChild(tabs);
+
+  if(PAY_TAB==="task"){
+    // per-task table
+    const tbl=div({background:"#0d1117",border:"1px solid #1a2030",borderRadius:"12px",overflow:"hidden",marginBottom:"14px"});
+    const th=div({padding:"10px 16px",borderBottom:"1px solid #1a2030"}); th.innerHTML=`<span style="font-size:12px;color:#cbd5e1;font-weight:600">Per-Task Summary</span>`; tbl.appendChild(th);
+    const thead=div({display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 100px 50px",padding:"6px 16px",borderBottom:"1px solid #1a2030",background:"#07090f"});
+    ["Task","Budget","Paid","Remaining","Pay%","Txns"].forEach(h=>{ const d=el("div",{style:{fontSize:"9px",color:"#334155",letterSpacing:"1px",textTransform:"uppercase"}}); d.textContent=h; thead.appendChild(d); });
+    tbl.appendChild(thead);
+    TASKS.forEach((task,i)=>{
+      const s=DATA.tasks[task.id],b=s.budget,pp=b.total>0?Math.min(100,Math.round(b.paid/b.total*100)):0;
+      const row=div({display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 100px 50px",padding:"9px 16px",borderBottom:i<TASKS.length-1?"1px solid #07090f":"none",background:i%2===0?"#07090f":"#0d1117",alignItems:"center"});
+      const c1=div({display:"flex",alignItems:"center",gap:"7px"}); c1.innerHTML=`<span style="font-size:14px">${task.icon}</span><div><div style="font-size:12px;color:#cbd5e1">${DATA.names[task.id]}</div></div>`; row.appendChild(c1);
+      [b.total>0?"PKR "+fmtM(b.total):"—", "PKR "+fmtM(b.paid), b.total>0?"PKR "+fmtM(b.total-b.paid):"—"].forEach((v,ii)=>{ const d=el("div",{style:{fontSize:"12px",color:ii===0?"#38bdf8":ii===1?"#22c55e":"#f59e0b"}}); d.textContent=v; row.appendChild(d); });
+      const pb=div({display:"flex",gap:"5px",alignItems:"center"});
+      const pbg=div({flex:"1",height:"4px",background:"#1a2030",borderRadius:"99px",overflow:"hidden"});
+      pbg.appendChild(div({height:"100%",width:pp+"%",background:pp>=100?"#f43f5e":"#22c55e",borderRadius:"99px"}));
+      pb.appendChild(pbg); pb.appendChild(span({fontSize:"10px",color:"#334155"},b.total>0?pp+"%":"—"));
+      row.appendChild(pb);
+      const txns=el("div",{style:{fontSize:"12px",color:"#334155",textAlign:"center"}}); txns.textContent=(b.payments||[]).length; row.appendChild(txns);
+      tbl.appendChild(row);
+    });
+    root.appendChild(tbl);
+    // all transactions
+    const allPays=TASKS.flatMap(t=>(DATA.tasks[t.id].budget.payments||[]).map(p=>({...p,tid:t.id,tname:DATA.names[t.id],ticon:t.icon}))).sort((a,b)=>b.id-a.id);
+    const txBox=div({background:"#0d1117",border:"1px solid #1a2030",borderRadius:"12px",overflow:"hidden"});
+    const txHdr=div({padding:"10px 16px",borderBottom:"1px solid #1a2030",display:"flex",justifyContent:"space-between",alignItems:"center"});
+    txHdr.innerHTML=`<span style="font-size:12px;color:#cbd5e1;font-weight:600">All Transactions (${allPays.length})</span>`;
+    txBox.appendChild(txHdr);
+    if(allPays.length===0){ txBox.appendChild(el("div",{style:{padding:"28px",textAlign:"center",color:"#334155",fontSize:"12px"}},["No transactions yet."])); }
+    allPays.forEach(p=>{
+      const row=div({display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 16px",borderBottom:"1px solid #07090f",flexWrap:"wrap",gap:"6px"});
+      const left=div({display:"flex",alignItems:"center",gap:"9px"});
+      left.appendChild(span({fontSize:"15px"},p.ticon));
+      const ld=div({}); ld.innerHTML=`<div style="font-size:12px;color:#cbd5e1;font-weight:500">${p.tname}</div><div style="font-size:10px;color:#334155;margin-top:1px">${p.date} · ${p.by}</div>`; left.appendChild(ld); row.appendChild(left);
+      const right=div({display:"flex",alignItems:"center",gap:"8px"});
+      right.appendChild(span({fontSize:"14px",color:"#22c55e",fontWeight:"700"},fmt(p.amount)));
+      if(canEdit){ const db=btn("✕","transparent","#f43f5e",()=>{ DATA.tasks[p.tid].budget.payments=(DATA.tasks[p.tid].budget.payments||[]).filter(x=>x.id!==p.id); DATA.tasks[p.tid].budget.paid=DATA.tasks[p.tid].budget.payments.reduce((s,x)=>s+x.amount,0); saveData(); render(); },{padding:"2px 6px",fontSize:"10px",border:"1px solid #f43f5e33"}); right.appendChild(db); }
+      row.appendChild(right); txBox.appendChild(row);
+    });
+    root.appendChild(txBox);
+  }
+
+  else if(PAY_TAB==="labour"){
+    const kpi2=div({display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px",marginBottom:"14px"});
+    [{l:"Total Labour",v:fmt(totL),c:"#fb923c"},{l:"Entries",v:(DATA.labour||[]).length,c:"#cbd5e1"},{l:"Avg/Entry",v:(DATA.labour||[]).length>0?fmt(Math.round(totL/(DATA.labour||[]).length)):"—",c:"#f59e0b"}].forEach(x=>{ const k=div({background:"#0d1117",border:"1px solid #fb923c22",borderRadius:"12px",padding:"12px 14px"}); k.innerHTML=`<div style="font-size:9px;color:#334155;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">${x.l}</div><div style="font-size:20px;font-weight:700;color:${x.c}">${x.v}</div>`; kpi2.appendChild(k); });
+    root.appendChild(kpi2);
+    if(!isOffice){
+      // labour form
+      const lf=div({background:"#0d1117",border:"1px solid #7c2d1244",borderRadius:"12px",padding:"16px",marginBottom:"14px"});
+      lf.appendChild(el("div",{style:{fontSize:"13px",color:"#cbd5e1",fontWeight:"600",marginBottom:"12px"}},["➕ Record Labour Payment"]));
+      const r1=div({display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"8px"});
+      const laInp=inp("Amount (PKR) *","number"); laInp.style.color="#22c55e"; laInp.style.fontWeight="600";
+      const ldInp=inp("","date",todayStr());
+      const lmSel=el("select"); METHODS.forEach(m=>{ const o=el("option"); o.value=o.textContent=m; lmSel.appendChild(o); });
+      r1.appendChild(laInp); r1.appendChild(ldInp); r1.appendChild(lmSel); lf.appendChild(r1);
+      const r2=div({display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"10px"});
+      const lwkInp=inp("Worker name"); const lwInp=inp("Work description *"); const lnInp=inp("Note / reference");
+      r2.appendChild(lwkInp); r2.appendChild(lwInp); r2.appendChild(lnInp); lf.appendChild(r2);
+      lf.appendChild(btn("+ Record Labour Payment","#7c2d12","#fed7aa",()=>{
+        const amt=Number(laInp.value); if(!amt||amt<=0) return;
+        DATA.labour=[{id:Date.now(),amount:amt,date:ldInp.value,worker:lwkInp.value,work:lwInp.value,method:lmSel.value,note:lnInp.value,by:USER.name,at:nowStr()},...(DATA.labour||[])];
+        addLog("Labour","PKR"+fmtM(amt)+" "+lwInp.value);
+        render();
+      },{width:"100%",padding:"9px"}));
+      root.appendChild(lf);
+    }
+    // labour list
+    const ll=div({background:"#0d1117",border:"1px solid #1a2030",borderRadius:"12px",overflow:"hidden"});
+    const llh=div({padding:"10px 16px",borderBottom:"1px solid #1a2030",display:"flex",justifyContent:"space-between"});
+    llh.innerHTML=`<span style="font-size:12px;color:#cbd5e1;font-weight:600">Labour History (${(DATA.labour||[]).length})</span><span style="font-size:12px;color:#fb923c;font-weight:600">Total: ${fmt(totL)}</span>`;
+    ll.appendChild(llh);
+    if((DATA.labour||[]).length===0) ll.appendChild(el("div",{style:{padding:"28px",textAlign:"center",color:"#334155",fontSize:"12px"}},["No entries yet."]));
+    (DATA.labour||[]).forEach((l,i)=>{
+      const row=div({display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:i<(DATA.labour||[]).length-1?"1px solid #07090f":"none",background:i%2===0?"#07090f":"#0d1117",flexWrap:"wrap",gap:"6px"});
+      const left=div({}); left.innerHTML=`<div style="font-size:12px;color:#cbd5e1;font-weight:500">${l.work||"Labour"}</div><div style="font-size:10px;color:#334155;margin-top:1px">${l.date} · ${l.by}</div>`;
+      const right=div({display:"flex",alignItems:"center",gap:"8px"});
+      right.appendChild(span({fontSize:"14px",color:"#fb923c",fontWeight:"700"},fmt(l.amount)));
+      if(canEdit){ const db=btn("✕","transparent","#f43f5e",()=>{ DATA.labour=(DATA.labour||[]).filter(x=>x.id!==l.id); saveData(); render(); },{padding:"2px 6px",fontSize:"10px",border:"1px solid #f43f5e33"}); right.appendChild(db); }
+      row.appendChild(left); row.appendChild(right); ll.appendChild(row);
+    });
+    root.appendChild(ll);
+  }
+
+  else if(PAY_TAB==="material"){
+    // stock cards
+    const mats=DATA.mats||[];
+    const stockMap={};
+    mats.forEach(m=>{ if(!stockMap[m.name]) stockMap[m.name]={name:m.name,unit:m.unit,i:0,o:0,v:0}; if(m.type==="received"){stockMap[m.name].i+=m.qty;stockMap[m.name].v+=m.qty*(m.rate||0);}else stockMap[m.name].o+=m.qty; });
+    const stocks=Object.values(stockMap).map(x=>({...x,bal:x.i-x.o}));
+    const sg=div({display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:"10px",marginBottom:"14px"});
+    if(stocks.length===0){ const em=div({gridColumn:"1/-1",background:"#0d1117",border:"1px solid #1a2030",borderRadius:"12px",padding:"18px",textAlign:"center",color:"#334155",fontSize:"12px"}); em.textContent="No materials yet."; sg.appendChild(em); }
+    stocks.forEach(m=>{ const k=div({background:"#0d1117",border:`1px solid ${m.bal<0?"#f43f5e44":m.bal===0?"#64748b44":"#0f766e44"}`,borderRadius:"12px",padding:"11px 13px"}); k.innerHTML=`<div style="font-size:11px;color:#cbd5e1;font-weight:600;margin-bottom:2px">${m.name}</div><div style="font-size:18px;font-weight:700;color:${m.bal<0?"#f43f5e":m.bal===0?"#475569":"#22c55e"}">${m.bal}<span style="font-size:10px;font-weight:400"> ${m.unit}</span></div><div style="font-size:10px;color:#334155">In:${m.i} Out:${m.o}</div>${m.v>0?`<div style="font-size:10px;color:#38bdf8">PKR ${fmtM(m.v)}</div>`:""}` ; sg.appendChild(k); });
+    root.appendChild(sg);
+    if(!isOffice){
+      // material form
+      const mf=div({background:"#0d1117",border:"1px solid #0f766e44",borderRadius:"12px",padding:"16px",marginBottom:"14px"});
+      mf.appendChild(el("div",{style:{fontSize:"13px",color:"#cbd5e1",fontWeight:"600",marginBottom:"12px"}},["➕ Add Material Entry"]));
+      let mtype="received";
+      const mtRow=div({display:"flex",gap:"8px",marginBottom:"12px"});
+      const recBtn=btn("📥 Received","#0f766e","#5eead4",()=>{ mtype="received"; recBtn.style.background="#0f766e"; isBtn.style.background="#1a2030"; },{flex:"1",fontSize:"12px"});
+      const isBtn=btn("📤 Issued","#1a2030","#475569",()=>{ mtype="issued"; isBtn.style.background="#7c1d1d"; recBtn.style.background="#1a2030"; },{flex:"1",fontSize:"12px"});
+      mtRow.appendChild(recBtn); mtRow.appendChild(isBtn); mf.appendChild(mtRow);
+      const mr1=div({display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:"8px",marginBottom:"8px"});
+      const mnInp=inp("Material name *"); const muSel=el("select"); UNITS.forEach(u=>{ const o=el("option"); o.value=o.textContent=u; muSel.appendChild(o); }); const mdInp=inp("","date",todayStr());
+      mr1.appendChild(mnInp); mr1.appendChild(muSel); mr1.appendChild(mdInp); mf.appendChild(mr1);
+      const mr2=div({display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:"8px",marginBottom:"10px"});
+      const mqInp=inp("Qty *","number"); const mrInp=inp("Rate/unit","number"); const msInp=inp("Supplier"); const mnoteInp=inp("Note");
+      mr2.appendChild(mqInp); mr2.appendChild(mrInp); mr2.appendChild(msInp); mr2.appendChild(mnoteInp); mf.appendChild(mr2);
+      mf.appendChild(btn("Record Entry","#0f766e","#5eead4",()=>{
+        const qty=Number(mqInp.value); if(!mnInp.value.trim()||!qty||qty<=0) return;
+        DATA.mats=[{id:Date.now(),name:mnInp.value.trim(),unit:muSel.value,qty,type:mtype,date:mdInp.value,rate:Number(mrInp.value)||0,supplier:msInp.value,note:mnoteInp.value,by:USER.name,at:nowStr()},...(DATA.mats||[])];
+        addLog("Material "+mtype,qty+" "+muSel.value+" "+mnInp.value);
+        render();
+      },{width:"100%",padding:"9px"}));
+      root.appendChild(mf);
+    }
+    // ledger
+    const ml=div({background:"#0d1117",border:"1px solid #1a2030",borderRadius:"12px",overflow:"hidden"});
+    const mlh=div({padding:"10px 16px",borderBottom:"1px solid #1a2030"}); mlh.innerHTML=`<span style="font-size:12px;color:#cbd5e1;font-weight:600">Material Ledger (${mats.length})</span>`; ml.appendChild(mlh);
+    if(mats.length===0) ml.appendChild(el("div",{style:{padding:"28px",textAlign:"center",color:"#334155",fontSize:"12px"}},["No materials yet."]));
+    mats.forEach((m,i)=>{
+      const row=div({display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 16px",borderBottom:i<mats.length-1?"1px solid #07090f":"none",background:i%2===0?"#07090f":"#0d1117",flexWrap:"wrap",gap:"6px"});
+      const left=div({display:"flex",alignItems:"center",gap:"8px"});
+      left.appendChild(span({},m.type==="received"?"📥":"📤"));
+      const ld=div({}); ld.innerHTML=`<div style="font-size:12px;color:#cbd5e1;font-weight:600">${m.name}</div><div style="font-size:10px;color:#334155;margin-top:1px">${m.date} · ${m.by}${m.supplier?" · 🏭"+m.supplier:""}</div>`;
+      left.appendChild(ld); row.appendChild(left);
+      const right=div({display:"flex",alignItems:"center",gap:"8px"});
+      right.appendChild(span({fontSize:"15px",fontWeight:"700",color:m.type==="received"?"#22c55e":"#f43f5e"},(m.type==="received"?"+":"-")+m.qty+" "+m.unit));
+      if(canEdit){ const db=btn("✕","transparent","#f43f5e",()=>{ DATA.mats=(DATA.mats||[]).filter(x=>x.id!==m.id); saveData(); render(); },{padding:"2px 6px",fontSize:"10px",border:"1px solid #f43f5e33"}); right.appendChild(db); }
+      row.appendChild(right); ml.appendChild(row);
+    });
+    root.appendChild(ml);
+  }
+  return root;
+}
+
+// ─── ANALYTICS ────────────────────────────────────────────────────────────────
+function renderAnalytics(){
+  const root=div({});
+  const grid=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"});
+  // status
+  const sb=div({background:"#0d1117",border:"1px solid #1a2030",borderRadius:"12px",padding:"16px"});
+  sb.appendChild(el("div",{style:{fontSize:"13px",color:"#cbd5e1",fontWeight:"600",marginBottom:"12px"}},["Tasks by Status"]));
+  Object.entries(STATUS).forEach(([k,v])=>{
+    const count=TASKS.filter(t=>DATA.tasks[t.id].status===k).length;
+    const row=div({marginBottom:"10px"});
+    row.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:${v.color}">${v.label}</span><span style="color:#475569">${count}</span></div><div style="height:7px;background:#1a2030;border-radius:99px;overflow:hidden"><div style="height:100%;width:${count/TASKS.length*100}%;background:${v.color};border-radius:99px"></div></div>`;
+    sb.appendChild(row);
+  });
+  grid.appendChild(sb);
+  // budget
+  const bb=div({background:"#0d1117",border:"1px solid #1a2030",borderRadius:"12px",padding:"16px"});
+  bb.appendChild(el("div",{style:{fontSize:"13px",color:"#cbd5e1",fontWeight:"600",marginBottom:"12px"}},["Budget by Category"]));
+  const cols=["#38bdf8","#a78bfa","#22c55e","#f59e0b","#f43f5e"];
+  [...new Set(TASKS.map(t=>t.cat))].forEach((cat,i)=>{
+    const tasks=TASKS.filter(t=>t.cat===cat);
+    const budget=tasks.reduce((s,t)=>s+DATA.tasks[t.id].budget.total,0);
+    const paid=tasks.reduce((s,t)=>s+DATA.tasks[t.id].budget.paid,0);
+    const pct=budget>0?Math.round(paid/budget*100):0;
+    const color=cols[i%cols.length];
+    const row=div({marginBottom:"10px"});
+    row.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span style="color:${color}">${cat} (${tasks.length})</span><span style="color:#475569">PKR ${fmtM(budget)} · ${pct}%</span></div><div style="height:6px;background:${color}33;border-radius:99px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${color};border-radius:99px"></div></div>`;
+    bb.appendChild(row);
+  });
+  grid.appendChild(bb);
+  root.appendChild(grid);
+  return root;
+}
+
+// ─── LOG ─────────────────────────────────────────────────────────────────────
+function renderLog(){
+  const root=div({background:"#0d1117",border:"1px solid #1a2030",borderRadius:"12px",overflow:"hidden",maxWidth:"720px",margin:"0 auto"});
+  const hdr=div({padding:"12px 18px",borderBottom:"1px solid #1a2030",display:"flex",justifyContent:"space-between"});
+  hdr.innerHTML=`<span style="font-size:13px;color:#cbd5e1;font-weight:600">📜 Activity Log</span><span style="font-size:11px;color:#334155">${(DATA.log||[]).length} entries</span>`;
+  root.appendChild(hdr);
+  if((DATA.log||[]).length===0){ root.appendChild(el("div",{style:{padding:"36px",textAlign:"center",color:"#334155",fontSize:"13px"}},["No activity yet."])); return root; }
+  (DATA.log||[]).forEach((e,i)=>{
+    const u=USERS.find(u=>u.id===e.wid)||{color:"#475569",icon:"👤"};
+    const row=div({display:"flex",gap:"10px",padding:"10px 18px",borderBottom:i<(DATA.log||[]).length-1?"1px solid #07090f":"none",background:i%2===0?"#07090f":"#0d1117"});
+    row.appendChild(span({fontSize:"14px",marginTop:"2px"},u.icon));
+    const d=div({flex:"1"}); d.innerHTML=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px"><span style="font-size:12px;color:${u.color};font-weight:600">${e.who}</span><span style="font-size:10px;color:#334155">${e.time}</span></div><div style="font-size:12px;color:#cbd5e1;margin-top:1px"><span style="color:#f59e0b">${e.action}</span>${e.detail?" — "+e.detail:""}</div>`;
+    row.appendChild(d); root.appendChild(row);
+  });
+  return root;
+}
+
+// ─── BRIEFING ────────────────────────────────────────────────────────────────
+function renderBriefing(){
+  const totB=Object.values(DATA.tasks).reduce((s,t)=>s+(t.budget.total||0),0);
+  const totP=Object.values(DATA.tasks).reduce((s,t)=>s+(t.budget.paid||0),0);
+  const totL=(DATA.labour||[]).reduce((s,l)=>s+l.amount,0);
+  const totPr=Math.round(Object.values(DATA.tasks).reduce((s,t)=>s+t.progress,0)/TASKS.length);
+  const root=div({maxWidth:"680px",margin:"0 auto"});
+  const box=div({background:"#0d1117",border:"1px solid #7c1d1d33",borderRadius:"14px",padding:"24px"});
+  box.innerHTML=`<div style="font-size:10px;color:#fb923c;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;font-weight:600">🤖 AI Daily Briefing</div><div style="font-size:18px;color:#f1f5f9;font-weight:700;margin-bottom:3px">Construction Report</div><div style="font-size:11px;color:#334155;margin-bottom:16px">${PROJECT.name}</div>`;
+  const kgrid=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"16px"});
+  [{l:"Budget",v:fmt(totB),c:"#38bdf8"},{l:"Paid",v:fmt(totP),c:"#22c55e"},{l:"Labour",v:fmt(totL),c:"#fb923c"},{l:"Progress",v:totPr+"%",c:"#a78bfa"}].forEach(x=>{ const k=div({background:"#07090f",borderRadius:"8px",padding:"10px 12px"}); k.innerHTML=`<div style="font-size:10px;color:#334155;margin-bottom:2px;text-transform:uppercase">${x.l}</div><div style="font-size:16px;font-weight:700;color:${x.c}">${x.v}</div>`; kgrid.appendChild(k); });
+  box.appendChild(kgrid);
+  const content=el("div",{style:{fontSize:"13px",color:"#cbd5e1",lineHeight:"1.9",whiteSpace:"pre-wrap"}},["Click 'Generate Report' to get your AI briefing."]);
+  box.appendChild(content);
+  const genBtn=btn("🤖 Generate Report","#7c1d1d","#fca5a5",async()=>{
+    content.textContent="Analyzing…"; genBtn.disabled=true;
+    const sum=TASKS.map(t=>{ const s=DATA.tasks[t.id],b=s.budget; return DATA.names[t.id]+"["+t.priority+"]:"+s.status+"("+s.progress+"%)B:"+fmtM(b.total)+"P:"+fmtM(b.paid); }).join("\n");
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1400,system:"Senior construction PM briefing luxury home Lahore. Structured emoji-rich actionable.",messages:[{role:"user",content:"Project:"+PROJECT.name+"\nBudget:PKR"+fmtM(totB)+" Paid:PKR"+fmtM(totP)+" Labour:PKR"+fmtM(totL)+"\n\n"+sum+"\n\n1.📊 Health 2.🔴 Urgent 3.✅ Top 3 TODAY 4.💰 Finance 5.📅 Timeline"}]})});
+      const d=await r.json(); content.textContent=d.error?"⚠️ "+d.error.message:d.content?.map(c=>c.text||"").join("")||"No response.";
+    }catch(e){ content.textContent="⚠️ "+e.message; }
+    genBtn.disabled=false;
+  },{marginTop:"16px",width:"100%",padding:"10px"});
+  box.appendChild(genBtn);
+  root.appendChild(box);
+  return root;
+}
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+(async()=>{
+  // show loading
+  const app=document.getElementById("app");
+  app.innerHTML=`<div style="min-height:100vh;background:#07090f;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px"><div style="font-size:48px">🏡</div><div style="font-size:18px;color:#f1f5f9;font-weight:700">Valencia 116-D</div><div style="font-size:13px;color:#475569">Loading project data…</div><div class="spin"></div></div>`;
+  // load data
+  const saved=await dbLoad();
+  DATA=mergeData(saved);
+  // render login
+  render();
+})();
 </script>
 </body>
 </html>
